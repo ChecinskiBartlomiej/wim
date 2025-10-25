@@ -21,8 +21,8 @@ jobs:
         echo "=== Disk space BEFORE cleanup ==="
         df -h
         echo ""
-        echo "=== Cleaning up Docker cache and unused images ==="
-        docker system prune -af --volumes
+        echo "=== Cleaning up Docker BUILD CACHE only (keeping images) ==="
+        docker builder prune -af
         echo ""
         echo "=== Disk space AFTER cleanup ==="
         df -h
