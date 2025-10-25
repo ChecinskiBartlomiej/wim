@@ -16,6 +16,17 @@ jobs:
     - name: Build Docker image
       run: docker build -t mlp-pytorch:latest ./test
 
+    - name: Free up disk space
+      run: |
+        echo "=== Disk space BEFORE cleanup ==="
+        df -h
+        echo ""
+        echo "=== Cleaning up Docker cache and unused images ==="
+        docker system prune -af --volumes
+        echo ""
+        echo "=== Disk space AFTER cleanup ==="
+        df -h
+
     - name: Install Apptainer
       run: |
         sudo add-apt-repository -y ppa:apptainer/ppa
