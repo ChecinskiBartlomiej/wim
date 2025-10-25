@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 import numpy as np
+import time
 
 # Set random seed for reproducibility
 torch.manual_seed(42)
@@ -10,20 +11,25 @@ np.random.seed(42)
 
 
 class MLP(nn.Module):
-    """Simple Multi-Layer Perceptron"""
+    """Larger Multi-Layer Perceptron with 4 layers"""
     def __init__(self, input_size, hidden_size, output_size):
         super(MLP, self).__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)
-        self.relu = nn.ReLU()
+        self.relu1 = nn.ReLU()
         self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, output_size)
+        self.relu2 = nn.ReLU()
+        self.fc3 = nn.Linear(hidden_size, hidden_size)
+        self.relu3 = nn.ReLU()
+        self.fc4 = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
         x = self.fc1(x)
-        x = self.relu(x)
+        x = self.relu1(x)
         x = self.fc2(x)
-        x = self.relu(x)
+        x = self.relu2(x)
         x = self.fc3(x)
+        x = self.relu3(x)
+        x = self.fc4(x)
         return x
 
 
@@ -39,7 +45,7 @@ def generate_synthetic_data(n_samples=1000, n_features=10):
     return X.astype(np.float32), y
 
 
-def train_model(model, train_loader, criterion, optimizer, epochs=50):
+def train_model(model, train_loader, criterion, optimizer, device, epochs=50):
     """Train the model"""
     model.train()
 
@@ -49,6 +55,10 @@ def train_model(model, train_loader, criterion, optimizer, epochs=50):
         total = 0
 
         for inputs, labels in train_loader:
+            # Move data to device
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
             # Forward pass
             outputs = model(inputs)
             loss = criterion(outputs.squeeze(), labels)
@@ -70,7 +80,7 @@ def train_model(model, train_loader, criterion, optimizer, epochs=50):
             print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}, Accuracy: {accuracy:.2f}%')
 
 
-def test_model(model, test_loader):
+def test_model(model, test_loader, device):
     """Test the model"""
     model.eval()
     correct = 0
@@ -78,6 +88,10 @@ def test_model(model, test_loader):
 
     with torch.no_grad():
         for inputs, labels in test_loader:
+            # Move data to device
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
             outputs = model(inputs)
             predicted = (torch.sigmoid(outputs.squeeze()) > 0.5).float()
             total += labels.size(0)
@@ -89,19 +103,31 @@ def test_model(model, test_loader):
 
 
 def main():
+    # Start timing
+    start_time = time.time()
+
+    # Device configuration - use GPU if available
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    if device.type == 'cuda':
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"Number of GPUs available: {torch.cuda.device_count()}")
+    else:
+        print("No GPU available, using CPU")
+
     # Hyperparameters
     input_size = 10
-    hidden_size = 32
+    hidden_size = 4092
     output_size = 1  # Binary classification
     batch_size = 32
     learning_rate = 0.01
-    epochs = 50
+    epochs = 100
 
-    print("Generating synthetic training data...")
-    X_train, y_train = generate_synthetic_data(n_samples=1000, n_features=input_size)
+    print("\nGenerating synthetic training data...")
+    X_train, y_train = generate_synthetic_data(n_samples=10000, n_features=input_size)
 
     print("Generating synthetic test data...")
-    X_test, y_test = generate_synthetic_data(n_samples=200, n_features=input_size)
+    X_test, y_test = generate_synthetic_data(n_samples=2000, n_features=input_size)
 
     # Convert to PyTorch tensors
     X_train_tensor = torch.from_numpy(X_train)
@@ -118,17 +144,35 @@ def main():
 
     # Initialize model, loss function, and optimizer
     print(f"\nInitializing MLP with architecture: {input_size} -> {hidden_size} -> {hidden_size} -> {output_size}")
-    model = MLP(input_size, hidden_size, output_size)
+    model = MLP(input_size, hidden_size, output_size).to(device)
+    print(f"Model is on device: {next(model.parameters()).device}")
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     # Train the model
     print(f"\nTraining model for {epochs} epochs...")
-    train_model(model, train_loader, criterion, optimizer, epochs=epochs)
+    train_model(model, train_loader, criterion, optimizer, device, epochs=epochs)
 
     # Test the model
     print("\nEvaluating model on test data...")
-    test_model(model, test_loader)
+    test_accuracy = test_model(model, test_loader, device)
+
+    # Calculate elapsed time
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+
+    # Save test accuracy, execution time, and device info to file
+    output_file = "test_results_gpu.txt"
+    with open(output_file, 'w') as f:
+        f.write(f"Device: {device}\n")
+        if device.type == 'cuda':
+            f.write(f"GPU Name: {torch.cuda.get_device_name(0)}\n")
+            f.write(f"Number of GPUs: {torch.cuda.device_count()}\n")
+        f.write(f"Test Accuracy: {test_accuracy:.2f}%\n")
+        f.write(f"Execution Time: {elapsed_time:.2f} seconds\n")
+
+    print(f"\nExecution Time: {elapsed_time:.2f} seconds")
+    print(f"Results saved to {output_file}")
 
 
 if __name__ == "__main__":
