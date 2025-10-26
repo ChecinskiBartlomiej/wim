@@ -16,7 +16,7 @@ class ForwardProcess(Process):
 
     def add_noise(self, x_0, t):
 
-        alpha_bar_t = self.alpha_bars[t]
+        alpha_bar_t = self.alpha_bars[t].to(x_0.device)
         alpha_bar_t = alpha_bar_t[:, None, None, None]
 
         epsilon = torch.randn_like(x_0)
@@ -32,10 +32,10 @@ class BackwardProcess(Process):
 
     def denoise(self, x_t, t, noise_prediction):
 
-        beta_t = self.betas[t]
-        alpha_t = self.alphas[t]
-        alpha_bar_t = self.alpha_bars[t]
-        alpha_bar_t_minus_one = self.alpha_bars[t-1]
+        beta_t = self.betas[t].to(x_t.device)
+        alpha_t = self.alphas[t].to(x_t.device)
+        alpha_bar_t = self.alpha_bars[t].to(x_t.device)
+        alpha_bar_t_minus_one = self.alpha_bars[t-1].to(x_t.device)
 
         epsilon = torch.randn_like(x_t)
 
