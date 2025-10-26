@@ -37,3 +37,121 @@ class NormActConv(nn.Module):
         x = self.act(x)
         x = self.conv(x)
         return x
+
+class TimeEmbedding(nn.Module):
+    """Maps the Time Embedding to the required output dimension"""
+
+    def __init__(self, n_out: int, t_emb_dim: int=128):
+
+        super().__init__()
+
+        self.te_block = nn.Sequential(nn.SiLU(), nn.Linear(t_emb_dim, n_out))
+
+    def forward(self, x):
+        return self.te_block(x)
+
+class SelfAttentionBlock(nn.Module):
+    """Perform GroupNorm and Multihead Self Attention"""
+
+    def __init__(self, num_channels: int, num_groups: int=8, num_heads: int=4, norm: bool=True):
+        super().__init__()
+
+        self.g_norm = nn.GroupNorm(num_groups, num_channels) if norm is True else nn.Identity()
+
+        self.attn = nn.MultiheadAttention(num_channels, num_heads, batch_first=True)
+
+    def forward(self, x):
+
+        batch_size, channels, h, w = x.shape
+        x = x.reshape(batch_size, channels, h*w)
+        x = self.g_norm(x)
+        x = x.transpose(1, 2)
+        x, _ = self.attn(x, x, x)
+        x = x.transpose(1,2).reshape(batch_size, channels, h, w)
+
+        return x
+
+class Downsample(nn.Module):
+    """Perform Downsampling by the factor of k"""
+
+    def __init__(self, in_channels: int, out_channels: int, k: int=2, use_conv: bool=True, use_mpool: bool=True):
+        super().__init__()
+
+        self.use_conv = use_conv
+        self.use_mpool = use_mpool
+
+        self.cv = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=1),
+            nn.Conv2d(in_channels, out_channels//2 if use_mpool else out_channels, kernel_size=4, stride=k, padding=1)
+        ) if use_conv else nn.Identity()
+
+        self.mpool = nn.Sequential(
+            nn.MaxPool2d(k,k),
+            nn.Conv2d(in_channels, out_channels//2 if use_conv else out_channels, kernel_size=1, stride=1, padding=0)
+        ) if use_mpool else nn.Identity()
+
+    def forward(self, x):
+        
+        if not self.use_conv:
+            return self.mpool(x)
+        
+        if not self.use_mpool:
+            return self.cv(x)
+            
+        return torch.cat([self.cv(x), self.mpool(x)], dim=1)
+
+class Upsample(nn.Module):
+    """Perform Upsampling by the factor of k"""
+    def __init__(self, 
+                 in_channels: int, 
+                 out_channels: int, 
+                 k: int=2, 
+                 use_conv: bool=True, 
+                 use_upsample: bool=True 
+                ):
+        super().__init__()
+        
+        self.use_conv = use_conv
+        self.use_upsample = use_upsample
+        
+        self.cv = nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels,
+                out_channels//2 if use_upsample else out_channels, 
+                kernel_size=4, 
+                stride=k, 
+                padding=1
+            ),
+            nn.Conv2d(
+                out_channels//2 if use_upsample else out_channels, 
+                out_channels//2 if use_upsample else out_channels, 
+                kernel_size = 1, 
+                stride=1, 
+                padding=0
+            )
+        ) if use_conv else nn.Identity()
+
+        self.up = nn.Sequential(
+            nn.Upsample(
+                scale_factor=k, 
+                mode = 'bilinear', 
+                align_corners=False
+            ),
+            nn.Conv2d(
+                in_channels,
+                out_channels//2 if use_conv else out_channels, 
+                kernel_size=1, 
+                stride=1, 
+                padding=0
+            )
+        ) if use_upsample else nn.Identity()
+        
+    def forward(self, x):
+        
+        if not self.use_conv:
+            return self.up(x)
+        
+        if not self.use_upsample:
+            return self.cv(x)
+        
+        return torch.cat([self.cv(x), self.up(x)], dim=1)
