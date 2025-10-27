@@ -1,5 +1,5 @@
 from ddpm.utils.process import ForwardProcess, BackwardProcess
-from ddpm.utils.unet_utils import get_time_embedding, NormActConv, TimeEmbedding, SelfAttentionBlock, Downsample, Upsample, DownC, MidC
+from ddpm.utils.unet_utils import get_time_embedding, NormActConv, TimeEmbedding, SelfAttentionBlock, Downsample, Upsample, DownC, MidC, UpC
 import torch
 
 print("testing forward:")
@@ -117,7 +117,7 @@ print("testing Upsampling finished")
 
 print("testing DownC")
 
-down = DownC(in_channels=64, out_channels=64).to("cuda")
+down = DownC(in_channels=64, out_channels=128).to("cuda")
 x = torch.randn(10, 64, 28, 28).to("cuda")
 time_steps = torch.randint(0, 1000, (10,)).to("cuda")
 t_emb_dim = 128
@@ -135,3 +135,13 @@ out = mid(x, time_embedding)
 print(out.shape)
 print(out.device)
 print("testing MidC finished")
+
+print("testing UpC")
+
+up = UpC(in_channels=64, out_channels=32).to("cuda")
+down_out = torch.randn(10, 32, 56, 56).to("cuda")
+out = up(x, down_out, time_embedding)
+print(out.shape)
+print(out.device)
+
+print("testing UpC finished")

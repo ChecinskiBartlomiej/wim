@@ -1,3 +1,0 @@
-globalprotect disconnect –remote remote.wim.mil.pl
-
-scp -r plik_do_wysłania.txt imię.nazwisko@10.3.52.50:/gpfs/fs01/home/imię.nazwisko/
