@@ -22,6 +22,15 @@ def train(cfg):
 
     fp = ForwardProcess()
 
+    # Move all ForwardProcess tensors to device
+    fp.betas = fp.betas.to(device)
+    fp.sqrt_betas = fp.sqrt_betas.to(device)
+    fp.alphas = fp.alphas.to(device)
+    fp.sqrt_alphas = fp.sqrt_alphas.to(device)
+    fp.alpha_bars = fp.alpha_bars.to(device)
+    fp.sqrt_alpha_bars = fp.sqrt_alpha_bars.to(device)
+    fp.sqrt_one_minus_alpha_bars = fp.sqrt_one_minus_alpha_bars.to(device)
+
     best_eval_loss = float("inf")
 
     for epoch in range(cfg.num_epochs):
