@@ -1,7 +1,9 @@
 import torch
 
-class Process():
+
+class Process:
     """base class for forward and backward processes"""
+
     def __init__(self, num_time_steps=1000, beta_start=1e-4, beta_end=0.02):
         self.num_time_steps = num_time_steps
         self.betas = torch.linspace(beta_start, beta_end, num_time_steps)
@@ -23,6 +25,7 @@ class ForwardProcess(Process):
 
         return x_t
 
+
 class BackwardProcess(Process):
 
     def __init__(self, **kwargs):
@@ -33,7 +36,7 @@ class BackwardProcess(Process):
         beta_t = self.betas[t]
         alpha_t = self.alphas[t]
         alpha_bar_t = self.alpha_bars[t]
-        alpha_bar_t_minus_one = self.alpha_bars[t-1]
+        alpha_bar_t_minus_one = self.alpha_bars[t - 1]
 
         epsilon = torch.randn_like(x_t)
 

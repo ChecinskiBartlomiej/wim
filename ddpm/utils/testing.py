@@ -1,6 +1,20 @@
 from ddpm.utils.process import ForwardProcess as FP, BackwardProcess as BP
-from ddpm.utils.process_minimal import ForwardProcess as FPMinimal, BackwardProcess as BPMinimal
-from ddpm.utils.unet_utils import get_time_embedding, NormActConv, TimeEmbedding, SelfAttentionBlock, Downsample, Upsample, DownC, MidC, UpC, Unet
+from ddpm.utils.process_minimal import (
+    ForwardProcess as FPMinimal,
+    BackwardProcess as BPMinimal,
+)
+from ddpm.utils.unet_utils import (
+    get_time_embedding,
+    NormActConv,
+    TimeEmbedding,
+    SelfAttentionBlock,
+    Downsample,
+    Upsample,
+    DownC,
+    MidC,
+    UpC,
+    Unet,
+)
 import torch
 
 print("testing forward:")
@@ -80,7 +94,7 @@ print("testing TimeEmbedding")
 time_steps = torch.randint(0, 1000, (4,)).to("cuda")
 t_emb_dim = 128
 
-time_embedding = get_time_embedding(time_steps=time_steps, t_emb_dim = t_emb_dim)
+time_embedding = get_time_embedding(time_steps=time_steps, t_emb_dim=t_emb_dim)
 time_proj = TimeEmbedding(n_out=256, t_emb_dim=t_emb_dim).to("cuda")
 
 projected = time_proj(time_embedding)
@@ -150,7 +164,7 @@ down = DownC(in_channels=64, out_channels=128).to("cuda")
 x = torch.randn(10, 64, 28, 28).to("cuda")
 time_steps = torch.randint(0, 1000, (10,)).to("cuda")
 t_emb_dim = 128
-time_embedding = get_time_embedding(time_steps=time_steps, t_emb_dim = t_emb_dim)
+time_embedding = get_time_embedding(time_steps=time_steps, t_emb_dim=t_emb_dim)
 
 out = down(x, time_embedding)
 print(out.shape)

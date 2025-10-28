@@ -1,6 +1,7 @@
 """
 Main script to train DDPM model on WIM supercomputer
 """
+
 from ddpm.utils.config import CONFIG
 from ddpm.utils.training import train
 

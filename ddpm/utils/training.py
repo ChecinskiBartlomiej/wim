@@ -7,6 +7,7 @@ from tqdm import tqdm
 import torch
 import numpy as np
 
+
 def train(cfg):
 
     mnist_ds = CustomMnistDataset(cfg.train_csv_path)
@@ -57,10 +58,10 @@ def train(cfg):
 
             loss.backward()
             optimizer.step()
-        
+
         mean_epoch_loss = np.mean(losses)
 
-        print("Epoch: {} | Loss : {:4f}".format(epoch+1, mean_epoch_loss))
+        print("Epoch: {} | Loss : {:4f}".format(epoch + 1, mean_epoch_loss))
 
         if mean_epoch_loss < best_eval_loss:
             best_eval_loss = mean_epoch_loss

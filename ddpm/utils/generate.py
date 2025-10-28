@@ -2,6 +2,7 @@ import torch
 
 from ddpm.utils.process import BackwardProcess
 
+
 def generate(cfg):
     """generate new images"""
 
@@ -19,8 +20,8 @@ def generate(cfg):
         for t in reversed(range(cfg.num_timesteps)):
             noise_pred = model(x_t, torch.as_tensor(t).unsqueeze(0).to(device))
             x_t = bp.denoise(x_t, torch.as_tensor(t).to(device), noise_pred)
-            
-    x_t = torch.clamp(x_t, -1., 1.).detach().cpu()
+
+    x_t = torch.clamp(x_t, -1.0, 1.0).detach().cpu()
     x_t = (x_t + 1) / 2
 
     return x_t

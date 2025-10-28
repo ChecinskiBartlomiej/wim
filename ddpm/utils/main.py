@@ -1,7 +1,7 @@
 from ddpm.utils.config import CONFIG
 from ddpm.utils.generate import generate
 
-from matplotlib import pyplot as plt 
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
@@ -18,10 +18,10 @@ for i in tqdm(range(cfg.num_img_to_generate)):
 generated_df = pd.DataFrame(generated_imgs, columns=[f"pixel{i}" for i in range(784)])
 generated_df.to_csv(cfg.generated_csv_path, index=False)
 
-fig, axes = plt.subplots(8, 8, figsize=(5,5))
+fig, axes = plt.subplots(8, 8, figsize=(5, 5))
 
 for i, ax in enumerate(axes.flat):
-    ax.imshow(np.reshape(generated_imgs[i], (28,28)), cmap="gray")
+    ax.imshow(np.reshape(generated_imgs[i], (28, 28)), cmap="gray")
     ax.axis("off")
 
 plt.tight_layout()

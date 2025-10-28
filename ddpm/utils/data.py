@@ -1,7 +1,8 @@
-import pandas as pd 
-import numpy as np 
+import pandas as pd
+import numpy as np
 import torchvision
 from torch.utils.data import Dataset
+
 
 class CustomMnistDataset(Dataset):
     """Reads MNIST from csv"""
@@ -9,7 +10,7 @@ class CustomMnistDataset(Dataset):
     def __init__(self, csv_path, num_datapoints=None):
 
         super().__init__()
-        
+
         self.df = pd.read_csv(csv_path)
 
         if num_datapoints is not None:
@@ -20,8 +21,8 @@ class CustomMnistDataset(Dataset):
 
     def __getitem__(self, index):
 
-        img = self.df.iloc[index].filter(regex='pixel').values
-        img = np.reshape(img, (28,28)).astype(np.uint8)
+        img = self.df.iloc[index].filter(regex="pixel").values
+        img = np.reshape(img, (28, 28)).astype(np.uint8)
 
         img_tensor = torchvision.transforms.ToTensor()(img)
         img_tensor = 2 * img_tensor - 1
