@@ -1,27 +1,56 @@
-from ddpm.utils.process import ForwardProcess, BackwardProcess
+from ddpm.utils.process import ForwardProcess as FP, BackwardProcess as BP
+from ddpm.utils.process_minimal import ForwardProcess as FPMinimal, BackwardProcess as BPMinimal
 from ddpm.utils.unet_utils import get_time_embedding, NormActConv, TimeEmbedding, SelfAttentionBlock, Downsample, Upsample, DownC, MidC, UpC, Unet
 import torch
 
 print("testing forward:")
-forward = ForwardProcess()
+forward = FP()
 
 x_0 = torch.randn(4, 1, 28, 28).to("cuda")
+noise = torch.randn(4, 1, 28, 28).to("cuda")
 t_steps = torch.randint(0, 1000, (4,))
-out_forward = forward.add_noise(x_0, t_steps)
-print(out_forward.shape)
-print(out_forward.device)
+out = forward.add_noise(x_0, noise, t_steps)
+print(out.shape)
+print(out.device)
+
+print("testing forward finished")
+
+print("testing forward minimal")
+
+forward_minimal = FPMinimal()
+x_0 = torch.randn(4, 1, 28, 28).to("cuda")
+noise = torch.randn(4, 1, 28, 28).to("cuda")
+t_steps = torch.randint(0, 1000, (4,))
+out = forward_minimal.add_noise(x_0, noise, t_steps)
+print(out.shape)
+print(out.device)
+
+print("testing forward minimal finished")
 
 print("testing backward:")
-backward = BackwardProcess()
+
+backward = BP()
 
 x_t = torch.randn(1, 1, 28, 28).to("cuda")
 t = torch.randint(0, 1000, (1,))
 noise_pred = torch.randn(1, 1, 28, 28).to("cuda")
-out_backward = backward.denoise(x_t, t, noise_pred)
-print(out_backward.shape)
-print(out_backward.device)
+out = backward.denoise(x_t, t, noise_pred)
+print(out.shape)
+print(out.device)
 
-print("testing forward and backward finished")
+print("testing backward finished")
+
+print("testing backward minimal")
+
+backward_minimal = BPMinimal()
+x_t = torch.randn(1, 1, 28, 28).to("cuda")
+t = torch.randint(0, 1000, (1,))
+noise_pred = torch.randn(1, 1, 28, 28).to("cuda")
+out = backward_minimal.denoise(x_t, t, noise_pred)
+print(out.shape)
+print(out.device)
+
+print("testing backward minimal finished")
 
 print("testing time_embedding")
 

@@ -18,7 +18,7 @@ class ForwardProcess(Process):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def add_noise(self, x0, t):
+    def add_noise(self, x0, noise, t):
 
         sqrt_alpha_bar_t = self.sqrt_alpha_bars[t].to(x0.device)
         sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bars[t].to(x0.device)
@@ -26,9 +26,7 @@ class ForwardProcess(Process):
         sqrt_alpha_bar_t = sqrt_alpha_bar_t[:, None, None, None]
         sqrt_one_minus_alpha_bar_t = sqrt_one_minus_alpha_bar_t[:, None, None, None]
 
-        epsilon = torch.randn_like(x0)
-
-        x_t =  sqrt_alpha_bar_t * x0 + sqrt_one_minus_alpha_bar_t * epsilon
+        x_t =  sqrt_alpha_bar_t * x0 + sqrt_one_minus_alpha_bar_t * noise
 
         return x_t
 

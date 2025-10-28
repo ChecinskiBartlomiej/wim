@@ -14,14 +14,12 @@ class ForwardProcess(Process):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def add_noise(self, x_0, t):
+    def add_noise(self, x_0, noise, t):
 
         alpha_bar_t = self.alpha_bars[t].to(x_0.device)
         alpha_bar_t = alpha_bar_t[:, None, None, None]
 
-        epsilon = torch.randn_like(x_0)
-
-        x_t = torch.sqrt(alpha_bar_t) * x_0 + torch.sqrt(1 - alpha_bar_t) * epsilon
+        x_t = torch.sqrt(alpha_bar_t) * x_0 + torch.sqrt(1 - alpha_bar_t) * noise
 
         return x_t
 
