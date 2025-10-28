@@ -20,8 +20,8 @@ class ForwardProcess(Process):
 
     def add_noise(self, x0, noise, t):
 
-        sqrt_alpha_bar_t = self.sqrt_alpha_bars[t].to(x0.device)
-        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bars[t].to(x0.device)
+        sqrt_alpha_bar_t = self.sqrt_alpha_bars[t]
+        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bars[t]
 
         sqrt_alpha_bar_t = sqrt_alpha_bar_t[:, None, None, None]
         sqrt_one_minus_alpha_bar_t = sqrt_one_minus_alpha_bar_t[:, None, None, None]
@@ -37,11 +37,11 @@ class BackwardProcess(Process):
 
     def denoise(self, x_t, t, noise_prediction):
 
-        beta_t = self.betas[t].to(x_t.device)
-        sqrt_beta_t = self.sqrt_betas[t].to(x_t.device)
-        sqrt_alpha_t = self.sqrt_alphas[t].to(x_t.device)
-        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bars[t].to(x_t.device)
-        sqrt_one_minus_alpha_bar_t_minus_one = self.sqrt_one_minus_alpha_bars[t-1].to(x_t.device)
+        beta_t = self.betas[t]
+        sqrt_beta_t = self.sqrt_betas[t]
+        sqrt_alpha_t = self.sqrt_alphas[t]
+        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bars[t]
+        sqrt_one_minus_alpha_bar_t_minus_one = self.sqrt_one_minus_alpha_bars[t-1]
 
         epsilon = torch.randn_like(x_t)
 

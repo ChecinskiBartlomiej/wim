@@ -22,7 +22,7 @@ def train(cfg):
 
     fp = ForwardProcess()
 
-    # Move all ForwardProcess tensors to device
+    # Move all process parameters to device
     fp.betas = fp.betas.to(device)
     fp.sqrt_betas = fp.sqrt_betas.to(device)
     fp.alphas = fp.alphas.to(device)
