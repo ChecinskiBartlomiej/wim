@@ -1,8 +1,9 @@
 class CONFIG:
-    #model_path = 'ddpm_unet.pth'
-    #train_csv_path = '/kaggle/input/digit-recognizer/train.csv'
-    #test_csv_path = '/kaggle/input/digit-recognizer/test.csv'
-    #generated_csv_path = 'mnist_generated_data.csv'
+    # Relative paths (run from home directory on supercomputer)
+    model_path = "outputs/ddpm_unet.pth"
+    train_csv_path = "data/MNIST/train.csv"
+    test_csv_path = "data/MNIST/test.csv"
+    generated_csv_path = "outputs/mnist_generated_data.csv"
     num_epochs = 50
     lr = 1e-4
     num_timesteps = 1000
