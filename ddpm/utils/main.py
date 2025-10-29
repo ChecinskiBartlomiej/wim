@@ -25,4 +25,5 @@ for i, ax in enumerate(axes.flat):
     ax.axis("off")
 
 plt.tight_layout()
-plt.show()
+plt.savefig("outputs/ddpm_MNIST/generated_images_grid.png", dpi=150, bbox_inches="tight")
+print(f"Saved visualization to outputs/ddpm_MNIST/generated_images_grid.png")

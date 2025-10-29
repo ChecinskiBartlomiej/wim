@@ -1,6 +1,7 @@
 import torch
 
 from ddpm.utils.process import BackwardProcess
+from ddpm.utils.unet_utils import Unet
 
 
 def generate(cfg):
@@ -11,7 +12,20 @@ def generate(cfg):
 
     bp = BackwardProcess()
 
-    model = torch.load(cfg.model_path).to(device)
+    # Move BackwardProcess tensors to device
+    bp.betas = bp.betas.to(device)
+    bp.sqrt_betas = bp.sqrt_betas.to(device)
+    bp.alphas = bp.alphas.to(device)
+    bp.sqrt_alphas = bp.sqrt_alphas.to(device)
+    bp.alpha_bars = bp.alpha_bars.to(device)
+    bp.sqrt_alpha_bars = bp.sqrt_alpha_bars.to(device)
+    bp.sqrt_one_minus_alpha_bars = bp.sqrt_one_minus_alpha_bars.to(device)
+
+    # Create model architecture
+    model = Unet().to(device)
+
+    # Load only the weights (safe, no arbitrary code execution)
+    model.load_state_dict(torch.load(cfg.model_path, weights_only=True))
     model.eval()
 
     x_t = torch.randn(1, cfg.in_channels, cfg.img_size, cfg.img_size).to(device)

@@ -65,6 +65,6 @@ def train(cfg):
 
         if mean_epoch_loss < best_eval_loss:
             best_eval_loss = mean_epoch_loss
-            torch.save(model, cfg.model_path)
+            torch.save(model.state_dict(), cfg.model_path)
 
     print(f"Done training")
