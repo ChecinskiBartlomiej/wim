@@ -1,9 +1,9 @@
-from ddpm.utils.process import ForwardProcess as FP, BackwardProcess as BP
-from ddpm.utils.process_minimal import (
+from ddpm.process import ForwardProcess as FP, BackwardProcess as BP
+from ddpm.process_minimal import (
     ForwardProcess as FPMinimal,
     BackwardProcess as BPMinimal,
 )
-from ddpm.utils.unet_utils import (
+from ddpm.unet_utils import (
     get_time_embedding,
     NormActConv,
     TimeEmbedding,

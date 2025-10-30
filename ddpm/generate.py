@@ -1,14 +1,18 @@
 import torch
 
-from ddpm.utils.process import BackwardProcess
-from ddpm.utils.unet_utils import Unet
+from ddpm.process import BackwardProcess
+from ddpm.unet_utils import Unet
 
 
-def generate(cfg):
-    """generate new images"""
+def generate(cfg, model=None):
+    """generate new images
+
+    Args:
+        cfg: Configuration object
+        model: Optional pre-trained model. If None, loads from disk.
+    """
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
 
     bp = BackwardProcess()
 
@@ -21,12 +25,16 @@ def generate(cfg):
     bp.sqrt_alpha_bars = bp.sqrt_alpha_bars.to(device)
     bp.sqrt_one_minus_alpha_bars = bp.sqrt_one_minus_alpha_bars.to(device)
 
-    # Create model architecture
-    model = Unet().to(device)
-
-    # Load only the weights (safe, no arbitrary code execution)
-    model.load_state_dict(torch.load(cfg.model_path, weights_only=True))
-    model.eval()
+    # Use provided model or load from disk
+    if model is None:
+        print(f"Device: {device}")
+        model = Unet().to(device)
+        model_path = cfg.model_dir / "ddpm_unet.pth"
+        model.load_state_dict(torch.load(str(model_path), weights_only=True))
+        model.eval()
+    else:
+        # Use the provided model (already on device and in eval mode)
+        device = next(model.parameters()).device
 
     x_t = torch.randn(1, cfg.in_channels, cfg.img_size, cfg.img_size).to(device)
 
