@@ -367,7 +367,7 @@ class Unet(nn.Module):
 
     def __init__(
         self,
-        im_channels: int = 1,
+        im_channels: int,
         down_ch: list = [32, 64, 128, 256],
         mid_ch: list = [256, 256, 128],
         up_ch: list = [256, 128, 64, 16],

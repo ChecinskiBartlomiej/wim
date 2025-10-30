@@ -1,13 +1,13 @@
-from ddpm.data import CustomMnistDataset
 from ddpm.unet_utils import Unet
 from ddpm.process import ForwardProcess
 from ddpm.generate import generate
+from ddpm.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot
+from ddpm.visualization import plot_combined_stats, plot_generated_images
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 def train(cfg, optimizer_name="Adam"):
@@ -18,15 +18,14 @@ def train(cfg, optimizer_name="Adam"):
     optimizer_model_dir.mkdir(parents=True, exist_ok=True)
     optimizer_outputs_dir.mkdir(parents=True, exist_ok=True)
 
-    train_csv = cfg.data_dir / "train.csv"
-    mnist_ds = CustomMnistDataset(str(train_csv))
-    mnist_dl = DataLoader(mnist_ds, cfg.batch_size, shuffle=True)
+    dataset = cfg.dataset_class(str(cfg.train_data_path))
+    dataloader = DataLoader(dataset, cfg.batch_size, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
     print(f"Optimizer: {optimizer_name}\n")
 
-    model = Unet().to(device)
+    model = Unet(im_channels=cfg.im_channels).to(device)
     model_path = optimizer_model_dir / "ddpm_unet.pth"
 
     # Create optimizer based on name
@@ -80,7 +79,7 @@ def train(cfg, optimizer_name="Adam"):
 
         model.train()
 
-        for imgs in tqdm(mnist_dl):
+        for imgs in tqdm(dataloader):
 
             imgs = imgs.to(device)
 
@@ -99,50 +98,20 @@ def train(cfg, optimizer_name="Adam"):
             loss.backward()
 
             # Collect gradient statistics
-            all_grads = []
-            for param in model.parameters():
-                if param.grad is not None:
-                    all_grads.append(param.grad.flatten())
-
-            if len(all_grads) > 0:
-                all_grads = torch.cat(all_grads)
-
-                grad_norm = torch.norm(all_grads).item()
-                zero_grad_pct = (torch.sum(torch.abs(all_grads) < 1e-7).item() / all_grads.numel()) * 100
-
-                epoch_grad_stats["grad_norm"].append(grad_norm)
-                epoch_grad_stats["zero_grad_percentage"].append(zero_grad_pct)
+            grad_stats = collect_gradient_stats(model)
+            epoch_grad_stats["grad_norm"].append(grad_stats["grad_norm"])
+            epoch_grad_stats["zero_grad_percentage"].append(grad_stats["zero_grad_pct"])
 
             # Save weights before update (for computing update ratio)
-            old_weights = {}
-            for name, param in model.named_parameters():
-                old_weights[name] = param.data.clone()
+            old_weights = save_weights_snapshot(model)
 
             optimizer.step()
 
             # Collect weight statistics after update
-            all_weights = []
-            update_ratios = []
-            for name, param in model.named_parameters():
-                weight = param.data.flatten()
-                all_weights.append(weight)
-
-                # Compute update ratio
-                weight_update = param.data - old_weights[name]
-                ratio = torch.abs(weight_update) / (torch.abs(old_weights[name]) + 1e-10)
-                update_ratios.append(ratio.flatten())
-
-            if len(all_weights) > 0:
-                all_weights = torch.cat(all_weights)
-                all_update_ratios = torch.cat(update_ratios)
-
-                weight_norm = torch.norm(all_weights).item()
-                zero_weight_pct = (torch.sum(torch.abs(all_weights) < 1e-7).item() / all_weights.numel()) * 100
-                update_ratio = torch.mean(all_update_ratios).item()
-
-                epoch_weight_stats["weight_norm"].append(weight_norm)
-                epoch_weight_stats["zero_weight_percentage"].append(zero_weight_pct)
-                epoch_weight_stats["update_ratio"].append(update_ratio)
+            weight_stats = collect_weight_stats(model, old_weights)
+            epoch_weight_stats["weight_norm"].append(weight_stats["weight_norm"])
+            epoch_weight_stats["zero_weight_percentage"].append(weight_stats["zero_weight_pct"])
+            epoch_weight_stats["update_ratio"].append(weight_stats["update_ratio"])
 
         mean_epoch_loss = np.mean(losses)
         epoch_losses.append(mean_epoch_loss)
@@ -177,71 +146,35 @@ def train(cfg, optimizer_name="Adam"):
             with torch.no_grad():
                 for i in tqdm(range(cfg.num_img_to_generate), desc=f"Generating images"):
                     x_t = generate(cfg, model=model)
-                    x_t = 255 * x_t[0][0].numpy()
-                    generated_imgs.append(x_t.astype(np.uint8))
+                    x_t = x_t[0].numpy()  # Shape: (channels, H, W)
+                    x_t = np.transpose(x_t, (1, 2, 0))  # Shape: (H, W, channels)
+                    if cfg.im_channels == 1:
+                        x_t = x_t.squeeze()  # Remove channel dimension for grayscale: (H, W)
+                    x_t = 255 * x_t
+                    generated_imgs.append(x_t.astype(np.uint8).flatten())
 
-            fig, axes = plt.subplots(8, 8, figsize=(10, 10))
-            for i, ax in enumerate(axes.flat):
-                ax.imshow(np.reshape(generated_imgs[i], (28, 28)), cmap="gray")
-                ax.axis("off")
-
-            plt.tight_layout()
+            # Plot generated images
             grid_plot_path = optimizer_outputs_dir / f"generated_images_epoch_{epoch+1}.png"
-            plt.savefig(str(grid_plot_path), dpi=150, bbox_inches="tight")
-            plt.close()
+            plot_generated_images(generated_imgs, grid_plot_path, grid_size=(8, 8), cmap=cfg.cmap, im_channels=cfg.im_channels, img_size=cfg.img_size)
 
             print(f"Saved {cfg.num_img_to_generate} generated images to {grid_plot_path}")
             print(f"Checkpoint model saved to {checkpoint_model_path}")
 
             # Plot combined statistics up to current epoch (2x3 grid)
             epochs_so_far = list(range(1, epoch + 2))
-            fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-
-            # Row 1: Loss, Grad Norm, Zero Grad %
-            axes[0, 0].plot(epochs_so_far, epoch_losses, 'b-o', linewidth=2, markersize=6)
-            axes[0, 0].set_xlabel('Epoch', fontsize=12)
-            axes[0, 0].set_ylabel('Loss', fontsize=12)
-            axes[0, 0].set_title('Training Loss', fontsize=14, fontweight='bold')
-            axes[0, 0].grid(True, alpha=0.3)
-
-            axes[0, 1].plot(epochs_so_far, all_grad_norms, 'g-o', linewidth=2, markersize=6)
-            axes[0, 1].set_xlabel('Epoch', fontsize=12)
-            axes[0, 1].set_ylabel('Gradient Norm', fontsize=12)
-            axes[0, 1].set_title('Gradient Norm', fontsize=14, fontweight='bold')
-            axes[0, 1].grid(True, alpha=0.3)
-            axes[0, 1].ticklabel_format(style='scientific', axis='y', scilimits=(0,0))
-
-            axes[0, 2].plot(epochs_so_far, all_zero_grad_pcts, 'r-o', linewidth=2, markersize=6)
-            axes[0, 2].set_xlabel('Epoch', fontsize=12)
-            axes[0, 2].set_ylabel('Zero Grad %', fontsize=12)
-            axes[0, 2].set_title('Zero Gradient %', fontsize=14, fontweight='bold')
-            axes[0, 2].grid(True, alpha=0.3)
-
-            # Row 2: Weight Norm, Zero Weight %, Update Ratio
-            axes[1, 0].plot(epochs_so_far, all_weight_norms, 'c-o', linewidth=2, markersize=6)
-            axes[1, 0].set_xlabel('Epoch', fontsize=12)
-            axes[1, 0].set_ylabel('Weight Norm', fontsize=12)
-            axes[1, 0].set_title('Weight Norm', fontsize=14, fontweight='bold')
-            axes[1, 0].grid(True, alpha=0.3)
-            axes[1, 0].ticklabel_format(style='scientific', axis='y', scilimits=(0,0))
-
-            axes[1, 1].plot(epochs_so_far, all_zero_weight_pcts, 'm-o', linewidth=2, markersize=6)
-            axes[1, 1].set_xlabel('Epoch', fontsize=12)
-            axes[1, 1].set_ylabel('Zero Weight %', fontsize=12)
-            axes[1, 1].set_title('Zero Weight %', fontsize=14, fontweight='bold')
-            axes[1, 1].grid(True, alpha=0.3)
-
-            axes[1, 2].plot(epochs_so_far, all_update_ratios, 'orange', linewidth=2, markersize=6, marker='o')
-            axes[1, 2].set_xlabel('Epoch', fontsize=12)
-            axes[1, 2].set_ylabel('Update Ratio', fontsize=12)
-            axes[1, 2].set_title('Weight Update Ratio', fontsize=14, fontweight='bold')
-            axes[1, 2].grid(True, alpha=0.3)
-            axes[1, 2].ticklabel_format(style='scientific', axis='y', scilimits=(0,0))
-
-            plt.tight_layout()
             combined_plot_path = optimizer_outputs_dir / f"combined_stats_epoch_{epoch+1}.png"
-            plt.savefig(str(combined_plot_path), dpi=150, bbox_inches="tight")
-            plt.close()
+
+            plot_combined_stats(
+                epoch_losses,
+                all_grad_norms,
+                all_zero_grad_pcts,
+                all_weight_norms,
+                all_zero_weight_pcts,
+                all_update_ratios,
+                epochs_so_far,
+                combined_plot_path,
+                title_suffix=f" - {optimizer_name}"
+            )
 
             print(f"Combined statistics plot saved to {combined_plot_path}\n")
 

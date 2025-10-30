@@ -1,11 +1,16 @@
 from pathlib import Path
+from ddpm.ddpm_mnist.data import CustomMnistDataset
 
 
 class CONFIG:
     # Base directories
-    data_dir = Path("data/MNIST")
-    model_dir = Path("outputs/ddpm_MNIST")
-    outputs_dir = Path("outputs/ddpm_MNIST")
+    data_dir = Path("data/mnist")
+    model_dir = Path("outputs/ddpm_mnist")
+    outputs_dir = Path("outputs/ddpm_mnist")
+
+    # Dataset configuration
+    train_data_path = data_dir / "train.csv"
+    dataset_class = CustomMnistDataset
 
     # Training parameters
     num_epochs = 150
@@ -13,8 +18,9 @@ class CONFIG:
     num_timesteps = 1000
     batch_size = 128
     img_size = 28
-    in_channels = 1
+    im_channels = 1
     num_img_to_generate = 64
+    cmap = "gray"  # Colormap for visualization
 
     # Optimizer configurations
     optimizer_configs = {

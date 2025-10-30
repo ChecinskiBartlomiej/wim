@@ -1,15 +1,18 @@
 import torch
+from pathlib import Path
 
 from ddpm.process import BackwardProcess
 from ddpm.unet_utils import Unet
 
 
-def generate(cfg, model=None):
-    """generate new images
+def generate(cfg, model):
+    """Generate new images
 
     Args:
         cfg: Configuration object
-        model: Optional pre-trained model. If None, loads from disk.
+        model: Either:
+            - str/Path: Load model weights from this file path
+            - nn.Module: Use this model directly (already loaded)
     """
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -25,18 +28,18 @@ def generate(cfg, model=None):
     bp.sqrt_alpha_bars = bp.sqrt_alpha_bars.to(device)
     bp.sqrt_one_minus_alpha_bars = bp.sqrt_one_minus_alpha_bars.to(device)
 
-    # Use provided model or load from disk
-    if model is None:
+    if isinstance(model, (str, Path)):
+        print(f"Loading model from: {model}")
         print(f"Device: {device}")
-        model = Unet().to(device)
-        model_path = cfg.model_dir / "ddpm_unet.pth"
-        model.load_state_dict(torch.load(str(model_path), weights_only=True))
-        model.eval()
+        unet = Unet(im_channels=cfg.im_channels).to(device)
+        unet.load_state_dict(torch.load(str(model), weights_only=True))
+        unet.eval()
+        model = unet
+
     else:
-        # Use the provided model (already on device and in eval mode)
         device = next(model.parameters()).device
 
-    x_t = torch.randn(1, cfg.in_channels, cfg.img_size, cfg.img_size).to(device)
+    x_t = torch.randn(1, cfg.im_channels, cfg.img_size, cfg.img_size).to(device)
 
     with torch.no_grad():
         for t in reversed(range(cfg.num_timesteps)):
