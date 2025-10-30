@@ -1,6 +1,6 @@
 """Main script to train DDPM model on WIM supercomputer using Adam optimizer"""
 
-from ddpm.config import CONFIG
+from ddpm.ddpm_mnist.config import CONFIG
 from ddpm.training import train
 
 if __name__ == "__main__":
