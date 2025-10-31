@@ -1,6 +1,5 @@
 from pathlib import Path
-# Note: CustomCifar10Dataset needs to be created in ddpm/ddpm_cifar10/data.py
-# from ddpm.ddpm_cifar10.data import CustomCifar10Dataset
+from ddpm.ddpm_cifar10.data import CustomCifar10Dataset
 
 
 class CONFIG:
@@ -11,11 +10,11 @@ class CONFIG:
 
     # Dataset configuration
     train_data_path = data_dir / "train"
-    # dataset_class = CustomCifar10Dataset  # Uncomment after creating data.py
+    dataset_class = CustomCifar10Dataset
 
     # Training parameters
-    num_epochs = 150
-    checkpoint_epochs = [25, 50, 75, 100, 125, 150]
+    num_epochs = 75
+    checkpoint_epochs = [25, 50, 75]
     num_timesteps = 1000
     batch_size = 128
     img_size = 32
