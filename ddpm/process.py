@@ -44,11 +44,14 @@ class BackwardProcess(Process):
         sqrt_beta_t = self.sqrt_betas[t]
         sqrt_alpha_t = self.sqrt_alphas[t]
         sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bars[t]
-        sqrt_one_minus_alpha_bar_t_minus_one = self.sqrt_one_minus_alpha_bars[t - 1]
 
-        epsilon = torch.randn_like(x_t)
-
-        sigma = (sqrt_one_minus_alpha_bar_t_minus_one / sqrt_one_minus_alpha_bar_t) * sqrt_beta_t
+        if t > 0:
+            sqrt_one_minus_alpha_bar_t_minus_one = self.sqrt_one_minus_alpha_bars[t - 1]
+            sigma = (sqrt_one_minus_alpha_bar_t_minus_one / sqrt_one_minus_alpha_bar_t) * sqrt_beta_t
+            epsilon = torch.randn_like(x_t)
+        else:
+            sigma = 0
+            epsilon = 0
 
         prev = (x_t - (beta_t / sqrt_one_minus_alpha_bar_t) * noise_prediction) / sqrt_alpha_t + sigma * epsilon
 

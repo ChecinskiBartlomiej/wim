@@ -68,10 +68,14 @@ def plot_combined_stats(
     axes[1, 1].set_title('Zero Weight %', fontsize=14, fontweight='bold')
     axes[1, 1].grid(True, alpha=0.3)
 
-    axes[1, 2].plot(epochs, all_update_ratios, 'orange', linewidth=2, markersize=6, marker='o')
+    # Skip first epoch for update ratio to avoid scale distortion
+    if len(epochs) > 1:
+        axes[1, 2].plot(epochs[1:], all_update_ratios[1:], 'orange', linewidth=2, markersize=6, marker='o')
+    else:
+        axes[1, 2].plot(epochs, all_update_ratios, 'orange', linewidth=2, markersize=6, marker='o')
     axes[1, 2].set_xlabel('Epoch', fontsize=12)
     axes[1, 2].set_ylabel('Update Ratio', fontsize=12)
-    axes[1, 2].set_title('Weight Update Ratio', fontsize=14, fontweight='bold')
+    axes[1, 2].set_title('Weight Update Ratio (excl. epoch 1)', fontsize=14, fontweight='bold')
     axes[1, 2].grid(True, alpha=0.3)
     axes[1, 2].ticklabel_format(style='scientific', axis='y', scilimits=(0, 0))
 
@@ -80,7 +84,7 @@ def plot_combined_stats(
     plt.close()
 
 
-def plot_generated_images(images, save_path, grid_size=(8, 8), cmap, im_channels, img_size):
+def plot_generated_images(images, save_path, cmap, im_channels, img_size, grid_size=(8, 8)):
     """
     Plot a grid of generated images.
 

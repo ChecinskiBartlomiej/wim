@@ -80,8 +80,10 @@ def collect_weight_stats(model, old_weights=None):
         # Compute update ratio if old weights are provided
         if old_weights is not None and name in old_weights:
             weight_update = param.data - old_weights[name]
-            ratio = torch.abs(weight_update) / (torch.abs(old_weights[name]) + 1e-10)
-            update_ratios.append(ratio.flatten())
+            update_norm = torch.norm(weight_update).item()
+            weight_norm = torch.norm(old_weights[name]).item()
+            ratio = update_norm / (weight_norm + 1e-10)
+            update_ratios.append(ratio)
 
     if len(all_weights) == 0:
         return {"weight_norm": 0.0, "zero_weight_pct": 0.0, "update_ratio": 0.0}
@@ -98,8 +100,7 @@ def collect_weight_stats(model, old_weights=None):
 
     # Add update ratio if computed
     if len(update_ratios) > 0:
-        all_update_ratios = torch.cat(update_ratios)
-        result["update_ratio"] = torch.mean(all_update_ratios).item()
+        result["update_ratio"] = np.mean(update_ratios)
     else:
         result["update_ratio"] = 0.0
 
