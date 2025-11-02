@@ -1,8 +1,7 @@
-from ddpm.unet_utils import Unet
-from ddpm.process import ForwardProcess
-from ddpm.generate import generate
-from ddpm.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot
-from ddpm.visualization import plot_combined_stats, plot_generated_images
+from ddpm_dlpm.unet_utils import Unet
+from ddpm_dlpm.process import DDPM, DLPM
+from ddpm_dlpm.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot
+from ddpm_dlpm.visualization import plot_combined_stats, plot_generated_images
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -23,9 +22,31 @@ def train(cfg, optimizer_name="Adam"):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
-    print(f"Optimizer: {optimizer_name}\n")
+    print(f"Diffusion: {cfg.diffusion.__name__}")
+    if hasattr(cfg, 'alpha'):
+        print(f"Alpha: {cfg.alpha}")
+    print(f"Optimizer: {optimizer_name}")
 
-    model = Unet(im_channels=cfg.im_channels).to(device)
+    diffusion = cfg.diffusion
+
+    # Create U-Net with architecture from config
+    model = Unet(
+        im_channels=cfg.im_channels,
+        down_ch=cfg.unet_down_ch,
+        mid_ch=cfg.unet_mid_ch,
+        up_ch=cfg.unet_up_ch,
+        down_sample=cfg.unet_down_sample,
+        t_emb_dim=cfg.unet_t_emb_dim,
+        num_downc_layers=cfg.unet_num_downc_layers,
+        num_midc_layers=cfg.unet_num_midc_layers,
+        num_upc_layers=cfg.unet_num_upc_layers,
+        dropout=cfg.unet_dropout,
+    ).to(device)
+
+    # Count and print parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"U-Net parameters: {total_params:,} ({total_params/1e6:.2f}M)\n")
+
     model_path = optimizer_model_dir / "ddpm_unet.pth"
 
     # Create optimizer based on name
@@ -39,18 +60,7 @@ def train(cfg, optimizer_name="Adam"):
     else:
         raise ValueError(f"Unknown optimizer: {optimizer_name}")
 
-    criterion = torch.nn.MSELoss()
-
-    fp = ForwardProcess()
-
-    # Move all process parameters to device
-    fp.betas = fp.betas.to(device)
-    fp.sqrt_betas = fp.sqrt_betas.to(device)
-    fp.alphas = fp.alphas.to(device)
-    fp.sqrt_alphas = fp.sqrt_alphas.to(device)
-    fp.alpha_bars = fp.alpha_bars.to(device)
-    fp.sqrt_alpha_bars = fp.sqrt_alpha_bars.to(device)
-    fp.sqrt_one_minus_alpha_bars = fp.sqrt_one_minus_alpha_bars.to(device)
+    criterion = diffusion.get_loss()
 
     best_eval_loss = float("inf")
     epoch_losses = []
@@ -83,16 +93,17 @@ def train(cfg, optimizer_name="Adam"):
 
             imgs = imgs.to(device)
 
-            noise = torch.randn_like(imgs).to(device)
+            target = diffusion.get_target(imgs, device)
+
             t = torch.randint(0, cfg.num_timesteps, (imgs.shape[0],)).to(device)
 
-            noisy_imgs = fp.add_noise(imgs, noise, t)
+            noisy_imgs = diffusion.forward(imgs, noise, t)
 
             optimizer.zero_grad()
 
             noise_pred = model(noisy_imgs, t)
 
-            loss = criterion(noise_pred, noise)
+            loss = criterion(noise_pred, target)
             losses.append(loss.item())
 
             loss.backward()
@@ -140,22 +151,17 @@ def train(cfg, optimizer_name="Adam"):
             checkpoint_model_path = optimizer_model_dir / f"ddpm_unet_epoch_{epoch+1}.pth"
             torch.save(model.state_dict(), str(checkpoint_model_path))
 
-            # Generate 64 images using current checkpoint model
+            # Generate images using current checkpoint model
             generated_imgs = []
             model.eval()
             with torch.no_grad():
                 for i in tqdm(range(cfg.num_img_to_generate), desc=f"Generating images"):
-                    x_t = generate(cfg, model=model)
-                    x_t = x_t[0].numpy()  # Shape: (channels, H, W)
-                    x_t = np.transpose(x_t, (1, 2, 0))  # Shape: (H, W, channels)
-                    if cfg.im_channels == 1:
-                        x_t = x_t.squeeze()  # Remove channel dimension for grayscale: (H, W)
-                    x_t = 255 * x_t
-                    generated_imgs.append(x_t.astype(np.uint8).flatten())
+                    img = diffusion.generate(cfg, model=model)
+                    generated_imgs.append(img.flatten())
 
             # Plot generated images
             grid_plot_path = optimizer_outputs_dir / f"generated_images_epoch_{epoch+1}.png"
-            plot_generated_images(generated_imgs, grid_plot_path, cmap=cfg.cmap, im_channels=cfg.im_channels, img_size=cfg.img_size)
+            plot_generated_images(generated_imgs, grid_plot_path, grid_size=(8, 8), cmap=cfg.cmap, im_channels=cfg.im_channels, img_size=cfg.img_size)
 
             print(f"Saved {cfg.num_img_to_generate} generated images to {grid_plot_path}")
             print(f"Checkpoint model saved to {checkpoint_model_path}")

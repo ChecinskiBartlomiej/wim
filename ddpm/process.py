@@ -20,7 +20,7 @@ class ForwardProcess(Process):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def add_noise(self, x0, noise, t):
+    def add_noise(self, x_0, noise, t):
 
         sqrt_alpha_bar_t = self.sqrt_alpha_bars[t]
         sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bars[t]
@@ -28,7 +28,7 @@ class ForwardProcess(Process):
         sqrt_alpha_bar_t = sqrt_alpha_bar_t[:, None, None, None]
         sqrt_one_minus_alpha_bar_t = sqrt_one_minus_alpha_bar_t[:, None, None, None]
 
-        x_t = sqrt_alpha_bar_t * x0 + sqrt_one_minus_alpha_bar_t * noise
+        x_t = sqrt_alpha_bar_t * x_0 + sqrt_one_minus_alpha_bar_t * noise
 
         return x_t
 

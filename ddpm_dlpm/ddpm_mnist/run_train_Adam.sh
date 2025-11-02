@@ -8,9 +8,9 @@
 #BSUB -gpu num=1           # Request 1 GPU
 #BSUB -M 8192              # Memory in MB (16 GB)
 #BSUB -W 24:00             # Max time HH:MM (24 hours)
-#BSUB -J ddpm_cifar10_adam # Job name
-#BSUB -o output_cifar10_adam_%J.txt    # Standard output file (%J = job ID)
-#BSUB -e error_cifar10_adam_%J.txt     # Error output file (%J = job ID)
+#BSUB -J ddpm_adam         # Job name
+#BSUB -o output_adam_%J.txt     # Standard output file (%J = job ID)
+#BSUB -e error_adam_%J.txt      # Error output file (%J = job ID)
 
 # Print job start info
 echo "=================================================="
@@ -26,7 +26,7 @@ cd $HOME
 source $HOME/ddpm_env/bin/activate
 
 # Run the training script
-python -m ddpm.ddpm_cifar10.train_Adam
+python -m ddpm.ddpm_mnist.train_Adam
 
 # Print job completion info
 echo "=================================================="
