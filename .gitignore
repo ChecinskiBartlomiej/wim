@@ -1,2 +1,4 @@
 data/
 outputs/
+*.pdf
+commands.txt

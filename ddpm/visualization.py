@@ -84,19 +84,20 @@ def plot_combined_stats(
     plt.close()
 
 
-def plot_generated_images(images, save_path, cmap, im_channels, img_size, grid_size=(8, 8)):
+def plot_generated_images(images, save_path, cmap, im_channels, img_size):
     """
     Plot a grid of generated images.
 
     Args:
         images: List of numpy arrays (flattened 1D images)
         save_path: Path to save the plot (should be Path object or string)
-        grid_size: Tuple (rows, cols) for the grid layout
         cmap: Colormap for images ("gray" for grayscale, None for RGB)
         im_channels: Number of image channels (1 for grayscale, 3 for RGB)
         img_size: Height/width of the square image
     """
-    rows, cols = grid_size
+    # Calculate grid size based on number of images (assumes perfect square)
+    grid_dim = int(np.sqrt(len(images)))
+    rows, cols = grid_dim, grid_dim
     fig, axes = plt.subplots(rows, cols, figsize=(5, 5))
 
     for i, ax in enumerate(axes.flat):
