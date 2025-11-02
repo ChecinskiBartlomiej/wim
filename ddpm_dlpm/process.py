@@ -88,6 +88,7 @@ class DiffusionProcess(ABC):
         if self.get_name() == "DLPM":
             a_samples = self.sample_alpha_stable(size=(1, cfg.num_timesteps), device=device)
             x_t = self.sigma_bars[-1] * torch.sqrt(self.sample_alpha_stable(size=(1, 1, 1, 1), device=device)) * torch.randn(1, cfg.im_channels, cfg.img_size, cfg.img_size, device=device)
+            sigma_sq_all = self._precompute_all_sigma_sq(a_samples, device)
 
         # Iterative denoising
         with torch.no_grad():
@@ -97,7 +98,7 @@ class DiffusionProcess(ABC):
                 if self.get_name() == "DDPM":
                     x_t = self.backward(x_t, t, noise_pred)
                 else:  # DLPM
-                    x_t = self.backward(x_t, t, noise_pred, a_samples)
+                    x_t = self.backward(x_t, t, noise_pred, a_samples, sigma_sq_all)
 
         # Normalize to [0, 1]
         x_t = torch.clamp(x_t, -1.0, 1.0).detach().cpu()
@@ -284,13 +285,14 @@ class DLPM(DiffusionProcess):
 
         return x_t
 
-    def backward(self, x_t, t, noise_prediction, a_samples):
+    def backward(self, x_t, t, noise_prediction, a_samples, sigma_sq_all):
         """
         Args:
             x_t: Noisy images at timestep t [batch_size, channels, height, width]
             t: Current timestep (scalar)
             noise_prediction: Predicted noise from model [batch_size, channels, height, width]
             a_samples: alpha/2-stable random variables A_{1:T} [batch_size, T]
+            sigma_sq_all: Precomputed Σ1→t values [T, batch_size] for efficiency
 
         Returns:
             x_{t-1}: Denoised images at previous timestep
@@ -298,17 +300,18 @@ class DLPM(DiffusionProcess):
         batch_size = x_t.shape[0]
         gamma_t = self.gammas[t]
         sigma_bar_t = self.sigma_bars[t]
-        sigma_sq_1_to_t = self._compute_sigma_sq(a_samples, t)
+
+        sigma_sq_1_to_t = sigma_sq_all[t]
 
         if t > 0:
+            sigma_sq_1_to_t_minus_1 = sigma_sq_all[t - 1]
 
-            sigma_sq_1_to_t_minus_1 = self._compute_sigma_sq(a_samples, t - 1)
             gamma_t_sq = gamma_t ** 2
             gamma_coeff = 1 - (gamma_t_sq * sigma_sq_1_to_t_minus_1) / sigma_sq_1_to_t
             variance_t_minus_1 = gamma_coeff * sigma_sq_1_to_t_minus_1
             gaussian_noise = torch.randn_like(x_t)
             noise_term = torch.sqrt(variance_t_minus_1[:, None, None, None]) * gaussian_noise
-            
+
         else:
 
             gamma_coeff = torch.ones(batch_size)
@@ -320,29 +323,28 @@ class DLPM(DiffusionProcess):
 
         return prev
 
-    def _compute_sigma_sq(self, a_samples, t):
+    def _precompute_all_sigma_sq(self, a_samples, device):
         """
         Args:
             a_samples: alpha/2-stable samples [batch_size, T] for all timesteps
-            t: Current timestep
+            device: torch device
 
         Returns:
-            sigma_sq: [batch_size] variance values
+            sigma_sq_all: [T, batch_size] precomputed sigma_sq values for all timesteps
         """
         batch_size = a_samples.shape[0]
-        sigma_sq = torch.zeros(batch_size)
+        T = a_samples.shape[1]
 
-        gamma_bar_t = self.gamma_bars[t]
+        sigma_sq_all = torch.zeros(T, batch_size, device=device)
 
-        for k in range(t):
-            gamma_bar_k = self.gamma_bars[k] if k > 0 else torch.tensor(1.0)
-            sigma_k = self.sigmas[k]
+        # Use recurrence formula:
+        for t in range(T):
+            if t == 0:
+                sigma_sq_all[0] = self.sigmas[0]**2 * a_samples[:, 0]
+            else:
+                sigma_sq_all[t] = self.sigmas[t]**2 * a_samples[:, t] + self.gammas[t]**2 * sigma_sq_all[t-1]
 
-            gamma_ratio = gamma_bar_t / gamma_bar_k
-            term = (gamma_ratio * torch.sqrt(a_samples[:, k]) * sigma_k) ** 2
-            sigma_sq += term
-
-        return sigma_sq
+        return sigma_sq_all
 
     def to(self, device):
         """Move all parameters to device"""

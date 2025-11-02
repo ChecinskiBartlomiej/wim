@@ -20,7 +20,7 @@ echo "Job ID: $LSB_JOBID"
 echo "=================================================="
 
 # Navigate to working directory
-cd $HOME/Desktop/wim
+cd $HOME
 
 # Activate virtual environment if you have one
 source $HOME/ddpm_env/bin/activate

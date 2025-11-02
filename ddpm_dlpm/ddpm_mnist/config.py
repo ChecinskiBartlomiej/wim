@@ -45,12 +45,6 @@ class CONFIG:
             "eps": 1e-8,
             "weight_decay": 0
         },
-        "SGD": {
-            "lr": 1e-3,
-            "momentum": 0.9,
-            "weight_decay": 1e-4,
-            "nesterov": True
-        },
         "AdamW": {
             "lr": 1e-4,
             "betas": (0.9, 0.999),

@@ -53,8 +53,6 @@ def train(cfg, optimizer_name="Adam"):
     optimizer_config = cfg.optimizer_configs[optimizer_name]
     if optimizer_name == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), **optimizer_config)
-    elif optimizer_name == "SGD":
-        optimizer = torch.optim.SGD(model.parameters(), **optimizer_config)
     elif optimizer_name == "AdamW":
         optimizer = torch.optim.AdamW(model.parameters(), **optimizer_config)
     else:

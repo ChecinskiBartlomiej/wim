@@ -1,5 +1,5 @@
 #!/bin/bash
-# LSF batch script to run DLPM training with Adam optimizer on WIM cluster
+# LSF batch script to run DLPM training with AdamW optimizer on WIM cluster
 
 # Job parameters
 #BSUB -m A100              # Request A100 GPU node
@@ -8,9 +8,9 @@
 #BSUB -gpu num=1           # Request 1 GPU
 #BSUB -M 8192              # Memory in MB (16 GB)
 #BSUB -W 24:00             # Max time HH:MM (24 hours)
-#BSUB -J dlpm_cifar10_adam # Job name
-#BSUB -o output_cifar10_adam_%J.txt    # Standard output file (%J = job ID)
-#BSUB -e error_cifar10_adam_%J.txt     # Error output file (%J = job ID)
+#BSUB -J dlpm_adamw        # Job name
+#BSUB -o output_adamw_%J.txt    # Standard output file (%J = job ID)
+#BSUB -e error_adamw_%J.txt     # Error output file (%J = job ID)
 
 # Print job start info
 echo "=================================================="
@@ -26,7 +26,7 @@ cd $HOME
 source $HOME/ddpm_env/bin/activate
 
 # Run the training script
-python -m ddpm_dlpm.dlpm_cifar10.train_Adam
+python -m ddpm_dlpm.dlpm_mnist.train_AdamW
 
 # Print job completion info
 echo "=================================================="

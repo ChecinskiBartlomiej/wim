@@ -8,11 +8,9 @@ class CONFIG:
     model_dir = Path("outputs/ddpm_cifar10")
     outputs_dir = Path("outputs/ddpm_cifar10")
 
-   
     train_data_path = data_dir / "train"
     dataset_class = CustomCifar10Dataset
 
-    
     num_epochs = 100
     checkpoint_epochs = [25, 50, 75, 100]
     num_timesteps = 1000
