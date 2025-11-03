@@ -27,7 +27,7 @@ def train(cfg, optimizer_name="Adam"):
         print(f"Alpha: {cfg.alpha}")
     print(f"Optimizer: {optimizer_name}")
 
-    diffusion = cfg.diffusion
+    diffusion = cfg.diffusion().to(device)
 
     # Create U-Net with architecture from config
     model = Unet(
@@ -91,7 +91,7 @@ def train(cfg, optimizer_name="Adam"):
 
             imgs = imgs.to(device)
 
-            target = diffusion.get_target(imgs, device)
+            noise = diffusion.get_noise(imgs, device)
 
             t = torch.randint(0, cfg.num_timesteps, (imgs.shape[0],)).to(device)
 
@@ -101,7 +101,7 @@ def train(cfg, optimizer_name="Adam"):
 
             noise_pred = model(noisy_imgs, t)
 
-            loss = criterion(noise_pred, target)
+            loss = criterion(noise_pred, noise)
             losses.append(loss.item())
 
             loss.backward()

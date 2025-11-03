@@ -17,7 +17,7 @@ class CONFIG:
     alpha = 1.7  # Tail index for alpha-stable distribution (1 < alpha <= 2)
 
     num_epochs = 100
-    checkpoint_epochs = [25, 50, 75, 100]
+    checkpoint_epochs = [2, 25, 50, 75, 100]
     num_timesteps = 1000
     batch_size = 128
     img_size = 32

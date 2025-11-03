@@ -19,7 +19,7 @@ class CONFIG:
 
     # Training parameters
     num_epochs = 150
-    checkpoint_epochs = [25, 50, 75, 100, 125, 150]
+    checkpoint_epochs = [2, 25, 50, 75, 100, 125, 150]
     num_timesteps = 1000
     batch_size = 128
     img_size = 28

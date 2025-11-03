@@ -17,8 +17,8 @@ class CONFIG:
     diffusion = DDPM  
  
     # Training parameters
-    num_epochs = 150
-    checkpoint_epochs = [25, 50, 75, 100, 125, 150]
+    num_epochs = 50
+    checkpoint_epochs = [25, 50]
     num_timesteps = 1000
     batch_size = 128
     img_size = 28

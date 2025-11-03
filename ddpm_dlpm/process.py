@@ -35,7 +35,7 @@ class DiffusionProcess(ABC):
         pass
 
     @abstractmethod
-    def get_target(self, imgs, device):
+    def get_noise(self, imgs, device):
         """Generate noise samples for training target"""
         pass
 
@@ -198,12 +198,12 @@ class DDPM(DiffusionProcess):
         """Return the name of the diffusion process"""
         return "DDPM"
 
-    def get_target(self, imgs, device):
+    def get_noise(self, imgs, device):
         """Generate Gaussian noise samples for training target"""
         return torch.randn_like(imgs).to(device)
 
     def get_loss(self):
-        return torch.nn.MSELoss()
+        return torch.nn.functional.mse_loss
 
 
 class DLPM(DiffusionProcess):
@@ -310,16 +310,14 @@ class DLPM(DiffusionProcess):
             gamma_coeff = 1 - (gamma_t_sq * sigma_sq_1_to_t_minus_1) / sigma_sq_1_to_t
             variance_t_minus_1 = gamma_coeff * sigma_sq_1_to_t_minus_1
             gaussian_noise = torch.randn_like(x_t)
-            noise_term = torch.sqrt(variance_t_minus_1[:, None, None, None]) * gaussian_noise
+            noise_term = torch.sqrt(variance_t_minus_1) * gaussian_noise
 
         else:
 
-            gamma_coeff = torch.ones(batch_size)
-            noise_term = 0.0
+            gamma_coeff = 1
+            noise_term = 0
 
-        gamma_t = gamma_t[:, None, None, None]
-        sigma_bar_t = sigma_bar_t[:, None, None, None]
-        prev = (x_t - gamma_coeff[:, None, None, None] * sigma_bar_t * noise_prediction) / gamma_t + noise_term
+        prev = (x_t - gamma_coeff * sigma_bar_t * noise_prediction) / gamma_t + noise_term
 
         return prev
 
@@ -359,10 +357,10 @@ class DLPM(DiffusionProcess):
         """Return the name of the diffusion process"""
         return "DLPM"
 
-    def get_target(self, imgs, device):
+    def get_noise(self, imgs, device):
         """Generate alpha-stable noise samples for training target"""
         return torch.sqrt(self.sample_alpha_stable(size=(1, 1, 1, 1), device=device)) * torch.randn_like(imgs).to(device)
 
     def get_loss(self):
-        return torch.sqrt(torch.nn.functional.mse_loss(pred, target))
+        return lambda pred, target: torch.sqrt(torch.nn.functional.mse_loss(pred, target))
 
