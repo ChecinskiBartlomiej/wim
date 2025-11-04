@@ -1,7 +1,7 @@
-from ddpm_dlpm.unet_utils import Unet
+from ddpm_dlpm.unet import Unet
 from ddpm_dlpm.process import DDPM, DLPM
-from ddpm_dlpm.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot
-from ddpm_dlpm.visualization import plot_combined_stats, plot_generated_images
+from ddpm_dlpm.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot, count_parameters
+from ddpm_dlpm.visualization import plot_combined_stats, plot_generated_images, plot_denoising_progress
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -17,7 +17,7 @@ def train(cfg, optimizer_name="Adam"):
     optimizer_model_dir.mkdir(parents=True, exist_ok=True)
     optimizer_outputs_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset = cfg.dataset_class(str(cfg.train_data_path))
+    dataset = cfg.dataset_class(str(cfg.train_data_path), use_horizontal_flip=cfg.use_horizontal_flip)
     dataloader = DataLoader(dataset, cfg.batch_size, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -26,10 +26,10 @@ def train(cfg, optimizer_name="Adam"):
     if hasattr(cfg, 'alpha'):
         print(f"Alpha: {cfg.alpha}")
     print(f"Optimizer: {optimizer_name}")
+    print(f"Horizontal flips: {cfg.use_horizontal_flip}")
 
     diffusion = cfg.diffusion().to(device)
 
-    # Create U-Net with architecture from config
     model = Unet(
         im_channels=cfg.im_channels,
         down_ch=cfg.unet_down_ch,
@@ -43,9 +43,10 @@ def train(cfg, optimizer_name="Adam"):
         dropout=cfg.unet_dropout,
     ).to(device)
 
-    # Count and print parameters
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"U-Net parameters: {total_params:,} ({total_params/1e6:.2f}M)\n")
+    # Count and display model parameters
+    param_counts = count_parameters(model)
+    print(f"Total parameters: {param_counts['total_params']:,}")
+    print(f"Trainable parameters: {param_counts['trainable_params']:,}\n")
 
     model_path = optimizer_model_dir / "ddpm_unet.pth"
 
@@ -63,9 +64,10 @@ def train(cfg, optimizer_name="Adam"):
     best_eval_loss = float("inf")
     epoch_losses = []
 
-    # Gradient statistics tracking
+    # Gradient statistics tracking with multiple thresholds
+    grad_thresholds = [10e-11, 10e-10, 10e-9, 10e-8, 10e-7]
     all_grad_norms = []
-    all_zero_grad_pcts = []
+    all_grad_below_thresh = {thresh: [] for thresh in grad_thresholds}  # Track each threshold separately
 
     # Weight statistics tracking
     all_weight_norms = []
@@ -77,7 +79,7 @@ def train(cfg, optimizer_name="Adam"):
         losses = []
         epoch_grad_stats = {
             "grad_norm": [],
-            "zero_grad_percentage": []
+            "grad_below_thresh": {thresh: [] for thresh in grad_thresholds}
         }
         epoch_weight_stats = {
             "weight_norm": [],
@@ -106,10 +108,11 @@ def train(cfg, optimizer_name="Adam"):
 
             loss.backward()
 
-            # Collect gradient statistics
-            grad_stats = collect_gradient_stats(model)
+            # Collect gradient statistics with multiple thresholds
+            grad_stats = collect_gradient_stats(model, thresholds=grad_thresholds)
             epoch_grad_stats["grad_norm"].append(grad_stats["grad_norm"])
-            epoch_grad_stats["zero_grad_percentage"].append(grad_stats["zero_grad_pct"])
+            for thresh in grad_thresholds:
+                epoch_grad_stats["grad_below_thresh"][thresh].append(grad_stats["grad_below_thresh"][thresh])
 
             # Save weights before update (for computing update ratio)
             old_weights = save_weights_snapshot(model)
@@ -127,7 +130,8 @@ def train(cfg, optimizer_name="Adam"):
 
         # Store epoch-averaged gradient statistics
         all_grad_norms.append(np.mean(epoch_grad_stats["grad_norm"]))
-        all_zero_grad_pcts.append(np.mean(epoch_grad_stats["zero_grad_percentage"]))
+        for thresh in grad_thresholds:
+            all_grad_below_thresh[thresh].append(np.mean(epoch_grad_stats["grad_below_thresh"][thresh]))
 
         # Store epoch-averaged weight statistics
         all_weight_norms.append(np.mean(epoch_weight_stats["weight_norm"]))
@@ -149,19 +153,51 @@ def train(cfg, optimizer_name="Adam"):
             checkpoint_model_path = optimizer_model_dir / f"ddpm_unet_epoch_{epoch+1}.pth"
             torch.save(model.state_dict(), str(checkpoint_model_path))
 
-            # Generate images using current checkpoint model
+            # Generate images with intermediate steps (efficient: one generation for both plots)
             generated_imgs = []
+            all_intermediate_images = []
+            all_timesteps = None
+
             model.eval()
             with torch.no_grad():
-                for i in tqdm(range(cfg.num_img_to_generate), desc=f"Generating images"):
-                    img = diffusion.generate(cfg, model=model)
-                    generated_imgs.append(img.flatten())
+                for i in tqdm(range(cfg.num_img_to_generate), desc=f"Generating images with denoising steps"):
+                    # Generate with intermediate timesteps
+                    intermediate_imgs, timesteps = diffusion.generate(
+                        cfg,
+                        model=model,
+                        return_intermediate=True,
+                        intermediate_step=cfg.denoising_timestep_interval
+                    )
 
-            # Plot generated images
+                    # Store final image (last in intermediate list) for grid plot
+                    final_img = intermediate_imgs[-1]
+                    generated_imgs.append(final_img.flatten())
+
+                    # Store all intermediate images for denoising progress plot
+                    all_intermediate_images.append(intermediate_imgs)
+
+                    # Store timesteps (same for all images)
+                    if all_timesteps is None:
+                        all_timesteps = timesteps
+
+            # Plot generated images (final images only)
             grid_plot_path = optimizer_outputs_dir / f"generated_images_epoch_{epoch+1}.png"
-            plot_generated_images(generated_imgs, grid_plot_path, grid_size=(8, 8), cmap=cfg.cmap, im_channels=cfg.im_channels, img_size=cfg.img_size)
+            plot_generated_images(generated_imgs, grid_plot_path, cmap=cfg.cmap, im_channels=cfg.im_channels, img_size=cfg.img_size)
 
             print(f"Saved {cfg.num_img_to_generate} generated images to {grid_plot_path}")
+
+            # Plot denoising progress (all intermediate timesteps)
+            denoising_progress_path = optimizer_outputs_dir / f"denoising_progress_epoch_{epoch+1}.png"
+            plot_denoising_progress(
+                all_intermediate_images,
+                all_timesteps,
+                denoising_progress_path,
+                cmap=cfg.cmap,
+                im_channels=cfg.im_channels,
+                img_size=cfg.img_size
+            )
+
+            print(f"Saved denoising progress visualization to {denoising_progress_path}")
             print(f"Checkpoint model saved to {checkpoint_model_path}")
 
             # Plot combined statistics up to current epoch (2x3 grid)
@@ -171,7 +207,7 @@ def train(cfg, optimizer_name="Adam"):
             plot_combined_stats(
                 epoch_losses,
                 all_grad_norms,
-                all_zero_grad_pcts,
+                all_grad_below_thresh,
                 all_weight_norms,
                 all_zero_weight_pcts,
                 all_update_ratios,

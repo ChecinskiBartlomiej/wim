@@ -3,7 +3,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from scipy.stats import levy_stable
 from pathlib import Path
-from ddpm_dlpm.unet_utils import Unet
+from ddpm_dlpm.unet import Unet
 
 
 class DiffusionProcess(ABC):
@@ -41,10 +41,10 @@ class DiffusionProcess(ABC):
 
     @abstractmethod
     def get_loss(self):
-        """Return description of the loss function"""
+        """Return loss function"""
         pass
 
-    def generate(self, cfg, model):
+    def generate(self, cfg, model, return_intermediate=False, intermediate_step=40):
         """Generate new images using the diffusion process
 
         Args:
@@ -52,10 +52,17 @@ class DiffusionProcess(ABC):
             model: Either:
                 - str/Path: Load model weights from this file path
                 - nn.Module: Use this model directly (already loaded)
+            return_intermediate: If True, return images at intermediate timesteps
+            intermediate_step: Step size for saving intermediate images (e.g., every 40 timesteps)
 
         Returns:
-            numpy array: Generated image in format (H, W, C) or (H, W) for grayscale,
-                        scaled to [0, 255] as uint8
+            If return_intermediate=False:
+                numpy array: Generated image in format (H, W, C) or (H, W) for grayscale,
+                            scaled to [0, 255] as uint8
+            If return_intermediate=True:
+                tuple: (intermediate_images, timesteps)
+                    - intermediate_images: List of images at intermediate timesteps
+                    - timesteps: List of corresponding timestep values
         """
 
         # Handle model loading
@@ -90,7 +97,9 @@ class DiffusionProcess(ABC):
             x_t = self.sigma_bars[-1] * torch.sqrt(self.sample_alpha_stable(size=(1, 1, 1, 1), device=device)) * torch.randn(1, cfg.im_channels, cfg.img_size, cfg.img_size, device=device)
             sigma_sq_all = self._precompute_all_sigma_sq(a_samples, device)
 
-        # Iterative denoising
+        intermediate_images = []
+        timesteps = []
+
         with torch.no_grad():
             for t in reversed(range(cfg.num_timesteps)):
                 noise_pred = model(x_t, torch.as_tensor(t).unsqueeze(0).to(device))
@@ -100,18 +109,33 @@ class DiffusionProcess(ABC):
                 else:  # DLPM
                     x_t = self.backward(x_t, t, noise_pred, a_samples, sigma_sq_all)
 
-        # Normalize to [0, 1]
-        x_t = torch.clamp(x_t, -1.0, 1.0).detach().cpu()
-        x_t = (x_t + 1) / 2
+                if return_intermediate and t % intermediate_step == 0:
+                    x_t_normalized = torch.clamp(x_t, -1.0, 1.0).detach().cpu()
+                    x_t_normalized = (x_t_normalized + 1) / 2
 
-        # Convert to numpy and post-process
-        x_t = x_t[0].numpy()  # Shape: (channels, H, W)
-        x_t = np.transpose(x_t, (1, 2, 0))  # Shape: (H, W, channels)
-        if cfg.im_channels == 1:
-            x_t = x_t.squeeze()  # Remove channel dimension for grayscale: (H, W)
-        x_t = 255 * x_t
+                    img = x_t_normalized[0].numpy()  
+                    img = np.transpose(img, (1, 2, 0)) 
+                    if cfg.im_channels == 1:
+                        img = img.squeeze()  
+                    img = 255 * img
 
-        return x_t.astype(np.uint8)
+                    intermediate_images.append(img.astype(np.uint8))
+                    timesteps.append(t)
+
+        if not return_intermediate:
+
+            x_t = torch.clamp(x_t, -1.0, 1.0).detach().cpu()
+            x_t = (x_t + 1) / 2
+
+            x_t = x_t[0].numpy()  
+            x_t = np.transpose(x_t, (1, 2, 0))  
+            if cfg.im_channels == 1:
+                x_t = x_t.squeeze()  
+            x_t = 255 * x_t
+
+            return x_t.astype(np.uint8)
+                 
+        return intermediate_images, timesteps
 
 
 class DDPM(DiffusionProcess):
@@ -170,7 +194,6 @@ class DDPM(DiffusionProcess):
         sqrt_alpha_t = self.sqrt_alphas[t]
         sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bars[t]
 
-        # Add noise only if not at t=0
         if t > 0:
             sqrt_one_minus_alpha_bar_t_minus_one = self.sqrt_one_minus_alpha_bars[t - 1]
             sigma = (sqrt_one_minus_alpha_bar_t_minus_one / sqrt_one_minus_alpha_bar_t) * sqrt_beta_t
@@ -195,11 +218,9 @@ class DDPM(DiffusionProcess):
         return self
 
     def get_name(self):
-        """Return the name of the diffusion process"""
         return "DDPM"
 
     def get_noise(self, imgs, device):
-        """Generate Gaussian noise samples for training target"""
         return torch.randn_like(imgs).to(device)
 
     def get_loss(self):

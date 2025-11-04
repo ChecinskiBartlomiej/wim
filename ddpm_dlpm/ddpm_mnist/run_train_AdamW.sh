@@ -26,7 +26,7 @@ cd $HOME
 source $HOME/ddpm_env/bin/activate
 
 # Run the training script
-python -m ddpm.ddpm_mnist.train_AdamW
+python -m ddpm_dlpm.ddpm_mnist.train_AdamW
 
 # Print job completion info
 echo "=================================================="

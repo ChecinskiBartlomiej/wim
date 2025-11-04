@@ -3,7 +3,7 @@ from ddpm.process_minimal import (
     ForwardProcess as FPMinimal,
     BackwardProcess as BPMinimal,
 )
-from ddpm.unet_utils import (
+from ddpm.unet import (
     get_time_embedding,
     NormActConv,
     TimeEmbedding,

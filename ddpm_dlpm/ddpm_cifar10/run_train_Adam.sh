@@ -26,7 +26,7 @@ cd $HOME
 source $HOME/ddpm_env/bin/activate
 
 # Run the training script
-python -m ddpm.ddpm_cifar10.train_Adam
+python -m ddpm_dlpm.ddpm_cifar10.train_Adam
 
 # Print job completion info
 echo "=================================================="

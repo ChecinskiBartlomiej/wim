@@ -2,7 +2,7 @@ import torch
 from pathlib import Path
 
 from ddpm.process import BackwardProcess
-from ddpm.unet_utils import Unet
+from ddpm.unet import Unet
 
 
 def generate(cfg, model):

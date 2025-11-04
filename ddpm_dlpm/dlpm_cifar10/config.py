@@ -1,5 +1,5 @@
 from pathlib import Path
-from ddpm_dlpm.data_cifar10 import CustomCifar10Dataset
+from ddpm_dlpm.custom_data import CustomCifar10Dataset
 from ddpm_dlpm.process import DLPM
 
 
@@ -11,19 +11,23 @@ class CONFIG:
 
     train_data_path = data_dir / "train"
     dataset_class = CustomCifar10Dataset
+    use_horizontal_flip = True  # DDPM paper: improves sample quality slightly for CIFAR10
 
     # Diffusion process configuration
     diffusion = DLPM
     alpha = 1.7  # Tail index for alpha-stable distribution (1 < alpha <= 2)
 
-    num_epochs = 100
-    checkpoint_epochs = [2, 25, 50, 75, 100]
+    num_epochs = 80
+    checkpoint_epochs = [10, 20, 30, 40, 50, 60, 70, 80]
     num_timesteps = 1000
     batch_size = 128
     img_size = 32
     im_channels = 3
-    num_img_to_generate = 16
+    num_img_to_generate = 25  # Changed to 25 for 5x5 grid
     cmap = None
+
+    # Denoising progress visualization
+    denoising_timestep_interval = 40  # Save image every N timesteps (1000/40 = 25 timesteps)
 
     # U-Net architecture (5 levels with 512 channels)
     unet_down_ch = [32, 64, 128, 256, 512]
@@ -39,13 +43,13 @@ class CONFIG:
     # Optimizer configurations
     optimizer_configs = {
         "Adam": {
-            "lr": 1e-4,
+            "lr": 2e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 0
         },
         "AdamW": {
-            "lr": 1e-4,
+            "lr": 2e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 1e-2

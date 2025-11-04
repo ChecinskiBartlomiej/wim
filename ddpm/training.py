@@ -1,4 +1,4 @@
-from ddpm.unet_utils import Unet
+from ddpm.unet import Unet
 from ddpm.process import ForwardProcess
 from ddpm.generate import generate
 from ddpm.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot

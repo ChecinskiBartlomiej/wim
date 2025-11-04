@@ -249,7 +249,7 @@ class DownC(nn.Module):
             out = self.conv1[i](out)
             out = out + self.te_block[i](t_emb)[:, :, None, None]
             out = self.conv2[i](out)
-            out = self.dropout(out)  # Apply dropout before residual connection
+            out = self.dropout(out)  
             out = out + self.res_block[i](resnet_input)
 
             out_attn = self.attn_block[i](out)
@@ -331,6 +331,7 @@ class UpC(nn.Module):
         up_sample: bool = True,
         dropout: float = 0.0,
     ):
+    
 
         super().__init__()
 
@@ -408,10 +409,13 @@ class Unet(nn.Module):
 
         self.cv1 = nn.Conv2d(self.im_channels, self.down_ch[0], kernel_size=3, padding=1)
 
+        # Project time embedding to maximum channel dimension
+        self.t_proj_dim = max(self.down_ch)
+
         self.t_proj = nn.Sequential(
-            nn.Linear(self.t_emb_dim, self.t_emb_dim),
+            nn.Linear(self.t_emb_dim, self.t_proj_dim),
             nn.SiLU(),
-            nn.Linear(self.t_emb_dim, self.t_emb_dim),
+            nn.Linear(self.t_proj_dim, self.t_proj_dim),
         )
 
         self.downs = nn.ModuleList(
@@ -419,7 +423,7 @@ class Unet(nn.Module):
                 DownC(
                     self.down_ch[i],
                     self.down_ch[i + 1],
-                    self.t_emb_dim,
+                    self.t_proj_dim,
                     self.num_downc_layers,
                     self.down_sample[i],
                     self.dropout,
@@ -433,7 +437,7 @@ class Unet(nn.Module):
                 MidC(
                     self.mid_ch[i],
                     self.mid_ch[i + 1],
-                    self.t_emb_dim,
+                    self.t_proj_dim,
                     self.num_midc_layers,
                     self.dropout,
                 )
@@ -446,7 +450,7 @@ class Unet(nn.Module):
                 UpC(
                     self.up_ch[i],
                     self.up_ch[i + 1],
-                    self.t_emb_dim,
+                    self.t_proj_dim,
                     self.num_upc_layers,
                     self.up_sample[i],
                     self.dropout,

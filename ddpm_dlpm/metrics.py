@@ -5,20 +5,29 @@ General-purpose functions that work with any PyTorch model.
 
 import torch
 import numpy as np
+from scipy import linalg
+from torchvision.models import inception_v3, Inception_V3_Weights
+from torch.utils.data import DataLoader, TensorDataset
+from tqdm import tqdm
 
 
-def collect_gradient_stats(model):
+def collect_gradient_stats(model, thresholds=None):
     """
     Collect gradient statistics from model parameters.
 
     Args:
         model: PyTorch model with computed gradients
+        thresholds: List of thresholds to track gradient sparsity at.
+                   If None, uses default [1e-10, 1e-8, 1e-6, 1e-4]
 
     Returns:
         dict: Dictionary containing gradient statistics
             - grad_norm: L2 norm of all gradients
-            - zero_grad_pct: Percentage of near-zero gradients
+            - grad_below_thresh: Dict mapping threshold to percentage of gradients below it
     """
+    if thresholds is None:
+        thresholds = [10e-11, 10e-10, 10e-9, 10e-8, 10e-7]
+
     all_grads = []
 
     for param in model.parameters():
@@ -26,16 +35,26 @@ def collect_gradient_stats(model):
             all_grads.append(param.grad.flatten())
 
     if len(all_grads) == 0:
-        return {"grad_norm": 0.0, "zero_grad_pct": 0.0}
+        result = {"grad_norm": 0.0, "grad_below_thresh": {}}
+        for thresh in thresholds:
+            result["grad_below_thresh"][thresh] = 0.0
+        return result
 
     all_grads = torch.cat(all_grads)
+    abs_grads = torch.abs(all_grads)
+    total_grads = all_grads.numel()
 
     grad_norm = torch.norm(all_grads).item()
-    zero_grad_pct = (torch.sum(torch.abs(all_grads) < 1e-7).item() / all_grads.numel()) * 100
+
+    # Calculate percentage below each threshold
+    grad_below_thresh = {}
+    for thresh in thresholds:
+        pct = (torch.sum(abs_grads < thresh).item() / total_grads) * 100
+        grad_below_thresh[thresh] = pct
 
     return {
         "grad_norm": grad_norm,
-        "zero_grad_pct": zero_grad_pct
+        "grad_below_thresh": grad_below_thresh
     }
 
 
@@ -105,3 +124,24 @@ def collect_weight_stats(model, old_weights=None):
         result["update_ratio"] = 0.0
 
     return result
+
+
+def count_parameters(model):
+    """
+    Count the total number of parameters in a model.
+
+    Args:
+        model: PyTorch model
+
+    Returns:
+        dict: Dictionary containing parameter counts
+            - total_params: Total number of parameters
+            - trainable_params: Number of trainable parameters
+    """
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    return {
+        "total_params": total_params,
+        "trainable_params": trainable_params
+    }

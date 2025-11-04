@@ -1,5 +1,5 @@
 from pathlib import Path
-from ddpm_dlpm.data_mnist import CustomMnistDataset
+from ddpm_dlpm.custom_data import CustomMnistDataset
 from ddpm_dlpm.process import DDPM
 
 
@@ -12,6 +12,7 @@ class CONFIG:
     # Dataset configuration
     train_data_path = data_dir / "train.csv"
     dataset_class = CustomMnistDataset
+    use_horizontal_flip = False  # No horizontal flips for MNIST
 
     # Diffusion process configuration
     diffusion = DDPM  
@@ -23,8 +24,11 @@ class CONFIG:
     batch_size = 128
     img_size = 28
     im_channels = 1
-    num_img_to_generate = 64
+    num_img_to_generate = 25  # Changed to 25 for 5x5 grid
     cmap = "gray"  # Colormap for visualization
+
+    # Denoising progress visualization
+    denoising_timestep_interval = 40  # Save image every N timesteps (1000/40 = 25 timesteps)
 
     # U-Net architecture (4 levels, smaller model for MNIST)
     unet_down_ch = [32, 64, 128, 256]
@@ -40,13 +44,13 @@ class CONFIG:
     # Optimizer configurations
     optimizer_configs = {
         "Adam": {
-            "lr": 1e-4,
+            "lr": 2e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 0
         },
         "AdamW": {
-            "lr": 1e-4,
+            "lr": 2e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 1e-2
