@@ -6,8 +6,8 @@
 #BSUB -q normal            # Queue type (normal for batch jobs)
 #BSUB -n 8                 # Number of CPU cores (for data loading)
 #BSUB -gpu num=1           # Request 1 GPU
-#BSUB -M 8192              # Memory in MB (16 GB)
-#BSUB -W 24:00             # Max time HH:MM (24 hours)
+#BSUB -M 16384             # Memory in MB (16 GB)
+#BSUB -W 48:00             # Max time HH:MM (48 hours)
 #BSUB -J ddpm_sgd          # Job name
 #BSUB -o output_sgd_%J.txt      # Standard output file (%J = job ID)
 #BSUB -e error_sgd_%J.txt       # Error output file (%J = job ID)

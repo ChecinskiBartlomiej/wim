@@ -31,6 +31,11 @@ class CONFIG:
     # Denoising progress visualization
     denoising_timestep_interval = 40  # Save image every N timesteps (1000/40 = 25 timesteps)
 
+    # FID calculation settings
+    num_fid_images = 5000  # Number of images for FID calculation (5000 for testing, 50000 for final)
+    inception_path = Path("pretrained_models/inception_v3_imagenet.pth")
+    fid_batch_size = 64
+
     # U-Net architecture (4 levels, smaller model for MNIST)
     unet_down_ch = [32, 64, 128, 256]
     unet_mid_ch = [256, 256, 128]

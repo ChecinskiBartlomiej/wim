@@ -44,32 +44,65 @@ class DiffusionProcess(ABC):
         """Return loss function"""
         pass
 
-    def generate(self, cfg, model, return_intermediate=False, intermediate_step=40):
-        """Generate new images using the diffusion process
+    @staticmethod
+    def tensor_to_image(x_t, cfg):
+        """
+        Convert tensor in [-1, 1] to numpy images in [0, 255] uint8.
+
+        Args:
+            x_t: Tensor [B, C, H, W] in range [-1, 1]
+            cfg: Configuration object
+
+        Returns:
+            list: List of numpy arrays, each in format (H, W, C) or (H, W) for grayscale,
+                  scaled to [0, 255] as uint8. Length = B.
+        """
+        # Clamp and normalize to [0, 1]
+        x_t = torch.clamp(x_t, -1.0, 1.0).detach().cpu()
+        x_t = (x_t + 1) / 2
+
+        batch_size = x_t.shape[0]
+        images = []
+
+        for i in range(batch_size):
+            img = x_t[i].numpy()
+            img = np.transpose(img, (1, 2, 0))  # [C, H, W] -> [H, W, C]
+
+            if cfg.im_channels == 1:
+                img = img.squeeze()
+
+            img = 255 * img
+            images.append(img.astype(np.uint8))
+
+        return images
+
+    def generate_samples(self, cfg, model, return_intermediate=False, intermediate_step=40, batch_size=1):
+        """
+        Generate samples using the diffusion process (backward denoising).
 
         Args:
             cfg: Configuration object
             model: Either:
                 - str/Path: Load model weights from this file path
                 - nn.Module: Use this model directly (already loaded)
-            return_intermediate: If True, return images at intermediate timesteps
-            intermediate_step: Step size for saving intermediate images (e.g., every 40 timesteps)
+            return_intermediate: If True, return samples at intermediate timesteps
+            intermediate_step: Step size for saving intermediate samples (e.g., every 40 timesteps)
+            batch_size: Number of images to generate in parallel (default: 1)
 
         Returns:
             If return_intermediate=False:
-                numpy array: Generated image in format (H, W, C) or (H, W) for grayscale,
-                            scaled to [0, 255] as uint8
+                Tensor: Generated samples [batch_size, C, H, W] in range [-1, 1]
             If return_intermediate=True:
-                tuple: (intermediate_images, timesteps)
-                    - intermediate_images: List of images at intermediate timesteps
+                tuple: (intermediate_samples, timesteps)
+                    - intermediate_samples: List of tensors [batch_size, C, H, W] in range [-1, 1]
                     - timesteps: List of corresponding timestep values
         """
-
         # Handle model loading
         if isinstance(model, (str, Path)):
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             print(f"Loading model from: {model}")
             print(f"Device: {device}")
+            from ddpm_dlpm.unet import Unet
             unet = Unet(
                 im_channels=cfg.im_channels,
                 down_ch=cfg.unet_down_ch,
@@ -88,21 +121,23 @@ class DiffusionProcess(ABC):
         else:
             device = next(model.parameters()).device
 
+        # Initialize noise
         if self.get_name() == "DDPM":
-            x_t = torch.randn(1, cfg.im_channels, cfg.img_size, cfg.img_size).to(device)
+            x_t = torch.randn(batch_size, cfg.im_channels, cfg.img_size, cfg.img_size).to(device)
 
         # Sample alpha-stable noise for DLPM
         if self.get_name() == "DLPM":
-            a_samples = self.sample_alpha_stable(size=(1, cfg.num_timesteps), device=device)
-            x_t = self.sigma_bars[-1] * torch.sqrt(self.sample_alpha_stable(size=(1, 1, 1, 1), device=device)) * torch.randn(1, cfg.im_channels, cfg.img_size, cfg.img_size, device=device)
+            a_samples = self.sample_alpha_stable(size=(batch_size, cfg.num_timesteps), device=device)
+            x_t = self.sigma_bars[-1] * torch.sqrt(self.sample_alpha_stable(size=(batch_size, 1, 1, 1), device=device)) * torch.randn(batch_size, cfg.im_channels, cfg.img_size, cfg.img_size, device=device)
             sigma_sq_all = self._precompute_all_sigma_sq(a_samples, device)
 
-        intermediate_images = []
+        intermediate_samples = []
         timesteps = []
 
+        # Backward diffusion process
         with torch.no_grad():
             for t in reversed(range(cfg.num_timesteps)):
-                noise_pred = model(x_t, torch.as_tensor(t).unsqueeze(0).to(device))
+                noise_pred = model(x_t, torch.as_tensor(t).unsqueeze(0).repeat(batch_size).to(device))
 
                 if self.get_name() == "DDPM":
                     x_t = self.backward(x_t, t, noise_pred)
@@ -110,32 +145,62 @@ class DiffusionProcess(ABC):
                     x_t = self.backward(x_t, t, noise_pred, a_samples, sigma_sq_all)
 
                 if return_intermediate and t % intermediate_step == 0:
-                    x_t_normalized = torch.clamp(x_t, -1.0, 1.0).detach().cpu()
-                    x_t_normalized = (x_t_normalized + 1) / 2
-
-                    img = x_t_normalized[0].numpy()  
-                    img = np.transpose(img, (1, 2, 0)) 
-                    if cfg.im_channels == 1:
-                        img = img.squeeze()  
-                    img = 255 * img
-
-                    intermediate_images.append(img.astype(np.uint8))
+                    intermediate_samples.append(x_t)
                     timesteps.append(t)
 
         if not return_intermediate:
+            return x_t  # [batch_size, C, H, W] in range [-1, 1]
 
-            x_t = torch.clamp(x_t, -1.0, 1.0).detach().cpu()
-            x_t = (x_t + 1) / 2
+        return intermediate_samples, timesteps
 
-            x_t = x_t[0].numpy()  
-            x_t = np.transpose(x_t, (1, 2, 0))  
-            if cfg.im_channels == 1:
-                x_t = x_t.squeeze()  
-            x_t = 255 * x_t
+    def generate(self, cfg, model, return_intermediate=False, intermediate_step=40, batch_size=1):
+        """
+        Generate new images using the diffusion process.
 
-            return x_t.astype(np.uint8)
-                 
-        return intermediate_images, timesteps
+        This is a convenience wrapper around generate_samples() that converts
+        tensors to numpy uint8 images.
+
+        Args:
+            cfg: Configuration object
+            model: Either:
+                - str/Path: Load model weights from this file path
+                - nn.Module: Use this model directly (already loaded)
+            return_intermediate: If True, return images at intermediate timesteps
+            intermediate_step: Step size for saving intermediate images (e.g., every 40 timesteps)
+            batch_size: Number of images to generate in parallel (default: 1)
+
+        Returns:
+            If return_intermediate=False:
+                list: List of numpy arrays, each in format (H, W, C) or (H, W) for grayscale,
+                      scaled to [0, 255] as uint8. Length = batch_size.
+            If return_intermediate=True:
+                tuple: (all_intermediate_images, timesteps)
+                    - all_intermediate_images: List of lists, where each inner list contains
+                      intermediate images for one sample. Length = batch_size.
+                    - timesteps: List of corresponding timestep values
+        """
+        # Generate samples (tensors in [-1, 1])
+        if return_intermediate:
+            intermediate_samples, timesteps = self.generate_samples(cfg, model, return_intermediate=True, intermediate_step=intermediate_step, batch_size=batch_size)
+
+            # intermediate_samples is a list of tensors [batch_size, C, H, W]
+            # Reorganize to batch_size lists of intermediate images
+            all_intermediate_images = [[] for _ in range(batch_size)]
+
+            for sample_tensor in intermediate_samples:
+                # sample_tensor is [batch_size, C, H, W]
+                # Convert to list of images
+                images = self.tensor_to_image(sample_tensor, cfg)
+                for i in range(batch_size):
+                    all_intermediate_images[i].append(images[i])
+
+            return all_intermediate_images, timesteps
+        else:
+            # Generate samples
+            samples = self.generate_samples(cfg, model, return_intermediate=False, batch_size=batch_size)
+
+            # Convert to numpy uint8 images (returns list)
+            return self.tensor_to_image(samples, cfg)
 
 
 class DDPM(DiffusionProcess):

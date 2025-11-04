@@ -1,6 +1,6 @@
 from ddpm_dlpm.unet import Unet
 from ddpm_dlpm.process import DDPM, DLPM
-from ddpm_dlpm.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot, count_parameters
+from ddpm_dlpm.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot, count_parameters, calculate_fid_from_model
 from ddpm_dlpm.visualization import plot_combined_stats, plot_generated_images, plot_denoising_progress
 
 from torch.utils.data import DataLoader
@@ -73,6 +73,10 @@ def train(cfg, optimizer_name="Adam"):
     all_weight_norms = []
     all_zero_weight_pcts = []
     all_update_ratios = []
+
+    # FID tracking
+    all_fid_scores = []
+    fid_file = optimizer_outputs_dir / "fid_scores.txt"
 
     for epoch in range(cfg.num_epochs):
 
@@ -153,32 +157,24 @@ def train(cfg, optimizer_name="Adam"):
             checkpoint_model_path = optimizer_model_dir / f"ddpm_unet_epoch_{epoch+1}.pth"
             torch.save(model.state_dict(), str(checkpoint_model_path))
 
-            # Generate images with intermediate steps (efficient: one generation for both plots)
-            generated_imgs = []
-            all_intermediate_images = []
-            all_timesteps = None
-
+            # Generate all images at once with intermediate steps (batch generation)
             model.eval()
             with torch.no_grad():
-                for i in tqdm(range(cfg.num_img_to_generate), desc=f"Generating images with denoising steps"):
-                    # Generate with intermediate timesteps
-                    intermediate_imgs, timesteps = diffusion.generate(
-                        cfg,
-                        model=model,
-                        return_intermediate=True,
-                        intermediate_step=cfg.denoising_timestep_interval
-                    )
+                # Generate all images in parallel
+                all_intermediate_images, all_timesteps = diffusion.generate(
+                    cfg,
+                    model=model,
+                    return_intermediate=True,
+                    intermediate_step=cfg.denoising_timestep_interval,
+                    batch_size=cfg.num_img_to_generate
+                )
 
-                    # Store final image (last in intermediate list) for grid plot
+                # Extract final images for grid plot
+                generated_imgs = []
+                for intermediate_imgs in all_intermediate_images:
+                    # Get last image (final denoised result)
                     final_img = intermediate_imgs[-1]
                     generated_imgs.append(final_img.flatten())
-
-                    # Store all intermediate images for denoising progress plot
-                    all_intermediate_images.append(intermediate_imgs)
-
-                    # Store timesteps (same for all images)
-                    if all_timesteps is None:
-                        all_timesteps = timesteps
 
             # Plot generated images (final images only)
             grid_plot_path = optimizer_outputs_dir / f"generated_images_epoch_{epoch+1}.png"
@@ -217,6 +213,16 @@ def train(cfg, optimizer_name="Adam"):
             )
 
             print(f"Combined statistics plot saved to {combined_plot_path}\n")
+
+            # Calculate FID score
+            fid_score = calculate_fid_from_model(diffusion, model, dataset, cfg, device=device)
+            all_fid_scores.append(fid_score)
+
+            # Save FID to single file (append mode)
+            
+            with open(fid_file, 'a') as f:
+                f.write(f"Epoch {epoch+1}: FID = {fid_score:.2f}\n")
+            print(f"FID results appended to: {fid_file}\n")
 
             model.train()
 

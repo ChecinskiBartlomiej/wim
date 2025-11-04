@@ -18,7 +18,7 @@ class CONFIG:
     diffusion = DDPM
 
     num_epochs = 80
-    checkpoint_epochs = [10, 20, 30, 40, 50, 60, 70, 80]
+    checkpoint_epochs = [20, 40, 60, 80]
     num_timesteps = 1000
     batch_size = 128
     img_size = 32
@@ -28,6 +28,11 @@ class CONFIG:
 
     # Denoising progress visualization
     denoising_timestep_interval = 40  # Save image every N timesteps (1000/40 = 25 timesteps)
+
+    # FID calculation settings
+    num_fid_images = 1280  # Number of images for FID calculation (5000 for testing, 50000 for final)
+    inception_path = Path("pretrained_models/inception_v3_imagenet.pth")
+    fid_batch_size = 64
 
     # U-Net architecture (5 levels with 512 channels)
     unet_down_ch = [32, 64, 128, 256, 512]
