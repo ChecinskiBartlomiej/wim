@@ -2,3 +2,4 @@ data/
 outputs/
 *.pdf
 commands.txt
+pretrained_models/

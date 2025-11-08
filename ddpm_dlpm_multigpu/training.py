@@ -1,8 +1,8 @@
-from ddpm_dlpm.unet import Unet
-from ddpm_dlpm.process import DDPM, DLPM
-from ddpm_dlpm.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot, count_parameters, calculate_fid_from_model
-from ddpm_dlpm.visualization import plot_combined_stats, plot_generated_images, plot_denoising_progress
-from ddpm_dlpm.ema import EMA
+from ddpm_dlpm_multigpu.unet import Unet
+from ddpm_dlpm_multigpu.process import DDPM, DLPM
+from ddpm_dlpm_multigpu.metrics import collect_gradient_stats, collect_weight_stats, save_weights_snapshot, count_parameters, calculate_fid_from_model
+from ddpm_dlpm_multigpu.visualization import plot_combined_stats, plot_generated_images, plot_denoising_progress
+from ddpm_dlpm_multigpu.ema import EMA
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm

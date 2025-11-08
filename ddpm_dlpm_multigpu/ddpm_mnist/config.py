@@ -1,6 +1,6 @@
 from pathlib import Path
-from ddpm_dlpm.custom_data import CustomMnistDataset
-from ddpm_dlpm.process import DDPM
+from ddpm_dlpm_multigpu.custom_data import CustomMnistDataset
+from ddpm_dlpm_multigpu.process import DDPM
 
 
 class CONFIG:

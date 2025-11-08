@@ -3,7 +3,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from scipy.stats import levy_stable
 from pathlib import Path
-from ddpm_dlpm.unet import Unet
+from ddpm_dlpm_multigpu.unet import Unet
 
 
 class DiffusionProcess(ABC):

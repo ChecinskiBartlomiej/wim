@@ -1,13 +1,13 @@
 from pathlib import Path
-from ddpm_dlpm.custom_data import CustomMnistDataset
-from ddpm_dlpm.process import DDPM
+from ddpm_dlpm_multigpu.custom_data import CustomMnistDataset
+from ddpm_dlpm_multigpu.process import DLPM
 
 
 class CONFIG:
     # Base directories
     data_dir = Path("data/mnist")
-    model_dir = Path("outputs/ddpm_mnist")
-    outputs_dir = Path("outputs/ddpm_mnist")
+    model_dir = Path("outputs/dlpm_mnist")
+    outputs_dir = Path("outputs/dlpm_mnist")
 
     # Dataset configuration
     train_data_path = data_dir / "train.csv"
@@ -15,13 +15,14 @@ class CONFIG:
     use_horizontal_flip = False  # No horizontal flips for MNIST
 
     # Diffusion process configuration
-    diffusion = DDPM  
- 
+    diffusion = DLPM
+    alpha = 1.7  # Tail index for alpha-stable distribution (1 < alpha <= 2)
+
     # Training parameters
-    num_epochs = 750
-    checkpoint_epochs = [75, 150, 225, 300, 375, 450, 525, 600, 675, 750]
+    num_epochs = 100
+    checkpoint_epochs = [20, 40, 60, 80, 100]
     num_timesteps = 1000
-    batch_size = 192
+    batch_size = 128
     img_size = 28
     im_channels = 1
     num_img_to_generate = 25  # Changed to 25 for 5x5 grid
@@ -31,7 +32,7 @@ class CONFIG:
     denoising_timestep_interval = 40  # Save image every N timesteps (1000/40 = 25 timesteps)
 
     # FID calculation settings
-    num_fid_images = 1280  # Number of images for FID calculation (5000 for testing, 50000 for final)
+    num_fid_images = 5000  # Number of images for FID calculation (5000 for testing, 50000 for final)
     inception_path = Path("pretrained_models/inception_v3_imagenet.pth")
     fid_batch_size = 64
 

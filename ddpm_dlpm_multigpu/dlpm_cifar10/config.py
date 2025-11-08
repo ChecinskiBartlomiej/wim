@@ -1,26 +1,26 @@
 from pathlib import Path
-from ddpm_dlpm.custom_data import CustomCifar10Dataset
-from ddpm_dlpm.process import DDPM
+from ddpm_dlpm_multigpu.custom_data import CustomCifar10Dataset
+from ddpm_dlpm_multigpu.process import DLPM
 
 
 class CONFIG:
 
     data_dir = Path("data/cifar10")
-    model_dir = Path("outputs/ddpm_cifar10")
-    outputs_dir = Path("outputs/ddpm_cifar10")
-
+    model_dir = Path("outputs/dlpm_cifar10")
+    outputs_dir = Path("outputs/dlpm_cifar10")
 
     train_data_path = data_dir / "train"
     dataset_class = CustomCifar10Dataset
     use_horizontal_flip = True  # DDPM paper: improves sample quality slightly for CIFAR10
 
     # Diffusion process configuration
-    diffusion = DDPM
+    diffusion = DLPM
+    alpha = 1.7  # Tail index for alpha-stable distribution (1 < alpha <= 2)
 
-    num_epochs = 750
-    checkpoint_epochs = [75, 150, 225, 300, 375, 450, 525, 600, 675, 750]
+    num_epochs = 80
+    checkpoint_epochs = [10, 20, 30, 40, 50, 60, 70, 80]
     num_timesteps = 1000
-    batch_size = 192
+    batch_size = 128
     img_size = 32
     im_channels = 3
     num_img_to_generate = 25  # Changed to 25 for 5x5 grid
@@ -30,7 +30,7 @@ class CONFIG:
     denoising_timestep_interval = 40  # Save image every N timesteps (1000/40 = 25 timesteps)
 
     # FID calculation settings
-    num_fid_images = 1280  # Number of images for FID calculation (5000 for testing, 50000 for final)
+    num_fid_images = 5000  # Number of images for FID calculation (5000 for testing, 50000 for final)
     inception_path = Path("pretrained_models/inception_v3_imagenet.pth")
     fid_batch_size = 64
 
