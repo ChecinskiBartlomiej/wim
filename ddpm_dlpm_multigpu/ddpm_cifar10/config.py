@@ -46,15 +46,20 @@ class CONFIG:
 
     optimizer_configs = {
         "Adam": {
-            "lr": 6e-4,
+            "lr": 2e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 0
         },
         "AdamW": {
-            "lr": 6e-4,
+            "lr": 2e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 1e-2
         }
     }
+
+    use_scheduler = False
+
+    resume_checkpoint = None
+    #resume_checkpoint = "outputs/ddpm_cifar10/AdamW/checkpoints/checkpoint_epoch_3000.pth"

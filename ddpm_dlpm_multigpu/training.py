@@ -129,16 +129,16 @@ def train(cfg, optimizer_name="Adam"):
     else:
         raise ValueError(f"Unknown optimizer: {optimizer_name}")
 
-    # Create learning rate warmup scheduler
-    scheduler = create_warmup_scheduler(optimizer, warmup_epochs=15, start_factor=0.2)
+    if cfg.use_scheduler:
+        scheduler = create_warmup_scheduler(optimizer, warmup_epochs=15, start_factor=0.2)
 
-    if rank == 0:
-        target_lr = optimizer_config["lr"]
-        print(f"Learning rate warmup scheduler created:")
-        print(f"  - Warmup epochs: 15")
-        print(f"  - Start LR: {target_lr * 0.2:.2e} (0.2x target)")
-        print(f"  - Target LR: {target_lr:.2e}")
-        print()
+        if rank == 0:
+            target_lr = optimizer_config["lr"]
+            print(f"Learning rate warmup scheduler created:")
+            print(f"  - Warmup epochs: 15")
+            print(f"  - Start LR: {target_lr * 0.2:.2e} (0.2x target)")
+            print(f"  - Target LR: {target_lr:.2e}")
+            print()
 
     # Initialize loss value and define gradient thresholds
     best_eval_loss = float("inf")
@@ -155,8 +155,49 @@ def train(cfg, optimizer_name="Adam"):
         all_fid_scores = []
         fid_file = optimizer_outputs_dir / "fid_scores.txt"
 
+    # Checkpoint resumption
+    start_epoch = 0
+    if cfg.resume_checkpoint is not None:
+        if rank == 0:
+            print(f"{'='*70}")
+            print(f"LOADING CHECKPOINT FOR RESUMPTION")
+            print(f"{'='*70}")
+            print(f"Checkpoint path: {cfg.resume_checkpoint}\n")
+
+        checkpoint = torch.load(cfg.resume_checkpoint, map_location=device)
+
+        # Restore model, EMA, optimizer states
+        model.module.load_state_dict(checkpoint['model_state_dict'])
+        ema.load_state_dict(checkpoint['ema_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        # Restore scheduler state if scheduler is enabled
+        if cfg.use_scheduler and 'scheduler_state_dict' in checkpoint:
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+
+        # Set starting epoch (resume from next epoch after checkpoint)
+        start_epoch = checkpoint['epoch'] + 1
+
+        # Restore statistics for rank 0 (for continuous plots)
+        if rank == 0:
+            epoch_losses = checkpoint.get('epoch_losses', [])
+            all_grad_norms = checkpoint.get('all_grad_norms', [])
+            all_grad_below_thresh = checkpoint.get('all_grad_below_thresh', {thresh: [] for thresh in grad_thresholds})
+            all_weight_norms = checkpoint.get('all_weight_norms', [])
+            all_zero_weight_pcts = checkpoint.get('all_zero_weight_pcts', [])
+            all_update_ratios = checkpoint.get('all_update_ratios', [])
+            all_fid_scores = checkpoint.get('all_fid_scores', [])
+
+            print(f"Resumed from epoch {checkpoint['epoch']}")
+            print(f"Starting training at epoch {start_epoch}")
+            print(f"Previous loss: {checkpoint['loss']:.6f}")
+            print(f"Loaded {len(epoch_losses)} epoch statistics")
+            print(f"Loaded {len(all_fid_scores)} FID scores")
+            print(f"{'='*70}\n")
+        dist.barrier()
+
     # Training loop
-    for epoch in range(cfg.num_epochs):
+    for epoch in range(start_epoch, start_epoch + cfg.num_epochs):
 
         # Set epoch for DistributedSampler (ensures proper shuffling)
         sampler.set_epoch(epoch)
@@ -245,13 +286,16 @@ def train(cfg, optimizer_name="Adam"):
             if global_stats['loss'] < best_eval_loss:
 
                 best_eval_loss = global_stats['loss']
-                torch.save({
+                best_model_dict = {
                     'model_state_dict': model.module.state_dict(),
                     'ema_state_dict': ema.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'epoch': epoch,
                     'loss': global_stats['loss']
-                }, str(model_path))
+                }
+                if cfg.use_scheduler:
+                    best_model_dict['scheduler_state_dict'] = scheduler.state_dict()
+                torch.save(best_model_dict, str(model_path))
 
         # Synchronize all ranks after epoch statistics gathering
         dist.barrier()
@@ -265,13 +309,26 @@ def train(cfg, optimizer_name="Adam"):
                 print(f"{'='*60}\n")
 
                 checkpoint_model_path = optimizer_model_dir / f"ddpm_unet_epoch_{epoch+1}.pth"
-                torch.save({
+                checkpoint_dict = {
                     'model_state_dict': model.module.state_dict(),
                     'ema_state_dict': ema.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
                     'epoch': epoch,
-                    'loss': global_stats['loss']
-                }, str(checkpoint_model_path))
+                    'loss': global_stats['loss'],
+                    # Save statistics for continuous plots when resuming
+                    'epoch_losses': epoch_losses,
+                    'all_grad_norms': all_grad_norms,
+                    'all_grad_below_thresh': all_grad_below_thresh,
+                    'all_weight_norms': all_weight_norms,
+                    'all_zero_weight_pcts': all_zero_weight_pcts,
+                    'all_update_ratios': all_update_ratios,
+                    'all_fid_scores': all_fid_scores
+                }
+
+                if cfg.use_scheduler:
+                    checkpoint_dict['scheduler_state_dict'] = scheduler.state_dict()
+
+                torch.save(checkpoint_dict, str(checkpoint_model_path))
 
                 # Generate all images at once with intermediate steps (batch generation), use EMA weights for generation
                 model.eval()
@@ -310,6 +367,10 @@ def train(cfg, optimizer_name="Adam"):
 
                 print(f"Saved denoising progress visualization to {denoising_progress_path}")
                 print(f"Checkpoint model saved to {checkpoint_model_path}")
+
+                # Restore training weights after generating 25 images
+                ema.restore(model.module)
+                model.train()
 
                 # Plot combined statistics up to current epoch (2x3 grid)
                 epochs_so_far = list(range(1, epoch + 2))
@@ -360,8 +421,9 @@ def train(cfg, optimizer_name="Adam"):
             ema.restore(model.module)
             model.train()
 
-        # Step the learning rate scheduler at the end of each epoch
-        scheduler.step()
+        # Step the learning rate scheduler at the end of each epoch (if enabled)
+        if cfg.use_scheduler:
+            scheduler.step()
 
     if rank == 0:
         print(f"Done training")
