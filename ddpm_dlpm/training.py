@@ -19,7 +19,13 @@ def train(cfg, optimizer_name="Adam"):
     optimizer_outputs_dir.mkdir(parents=True, exist_ok=True)
 
     dataset = cfg.dataset_class(str(cfg.train_data_path), use_horizontal_flip=cfg.use_horizontal_flip)
-    dataloader = DataLoader(dataset, cfg.batch_size, shuffle=True)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        num_workers=cfg.num_workers,
+        pin_memory=True
+    )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")

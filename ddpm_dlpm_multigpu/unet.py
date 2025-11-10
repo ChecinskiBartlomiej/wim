@@ -3,6 +3,7 @@ import torch.nn as nn
 
 
 def get_time_embedding(time_steps: torch.Tensor, t_emb_dim: int):
+    """Embed time into higher diemnsional space using sines and cosines"""
 
     assert t_emb_dim % 2 == 0
 
@@ -409,7 +410,6 @@ class Unet(nn.Module):
 
         self.cv1 = nn.Conv2d(self.im_channels, self.down_ch[0], kernel_size=3, padding=1)
 
-        # Project time embedding to maximum channel dimension
         self.t_proj_dim = max(self.down_ch)
 
         self.t_proj = nn.Sequential(

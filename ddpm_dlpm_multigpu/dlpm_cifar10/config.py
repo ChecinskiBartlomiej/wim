@@ -21,6 +21,7 @@ class CONFIG:
     checkpoint_epochs = [10, 20, 30, 40, 50, 60, 70, 80]
     num_timesteps = 1000
     batch_size = 128
+    num_workers = 4  # Number of DataLoader workers per GPU
     img_size = 32
     im_channels = 3
     num_img_to_generate = 25  # Changed to 25 for 5x5 grid

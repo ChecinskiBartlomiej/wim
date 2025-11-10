@@ -1,12 +1,3 @@
-"""
-Exponential Moving Average (EMA) for model parameters.
-
-EMA maintains a moving average of model parameters during training,
-which often leads to better and more stable generation quality.
-
-From DDPM paper: "We used EMA on model parameters with a decay factor of 0.9999."
-"""
-
 import torch
 
 
@@ -36,7 +27,7 @@ class EMA:
         """
         Update EMA parameters after an optimizer step.
 
-        Call this after optimizer.step() in your training loop.
+        Call this after optimizer.step()
 
         Args:
             model: The model being trained
@@ -44,18 +35,13 @@ class EMA:
         for name, param in model.named_parameters():
             if param.requires_grad:
                 assert name in self.shadow
-                # EMA update: new_ema = decay * old_ema + (1 - decay) * current
                 self.shadow[name] = self.decay * self.shadow[name] + (1.0 - self.decay) * param.data
 
     def apply_shadow(self, model):
         """
-        Replace model parameters with EMA parameters (for evaluation/generation).
-        Also saves current parameters to backup for later restoration.
+        Replace model parameters with EMA parameters (for generation).
 
-        Use this before generating images or evaluating:
-            ema.apply_shadow(model)
-            # ... generate images ...
-            ema.restore(model)
+        Also saves current parameters to backup for later restoration.
 
         Args:
             model: The model to apply EMA to

@@ -1,14 +1,14 @@
 #!/bin/bash
-# LSF batch script to run DDPM training with AdamW optimizer on WIM cluster
+# LSF batch script to run DDPM multi-GPU training with AdamW optimizer on WIM cluster
 
 # Job parameters
-#BSUB -m A100              # Request A100 GPU node
+#BSUB -m comp01              # Request A100 GPU node
 #BSUB -q normal            # Queue type (normal for batch jobs)
-#BSUB -n 8                 # Number of CPU cores (for data loading)
-#BSUB -gpu num=1           # Request 1 GPU
-#BSUB -M 16384             # Memory in MB (16 GB)
-#BSUB -W 72:00             # Max time HH:MM (48 hours)
-#BSUB -J ddpm_cifar10_adamw # Job name
+#BSUB -n 49                # Number of CPU cores (7 cores per GPU × 7 GPUs)
+#BSUB -gpu num=7           # Request 7 GPUs
+#BSUB -M 114688            # Memory in MB (112 GB, 16GB per GPU × 7)
+#BSUB -W 99:00             # Max time HH:MM (99 hours)
+#BSUB -J ddpm_cifar10_adamw_multigpu # Job name
 #BSUB -o output_cifar10_adamw_%J.txt    # Standard output file (%J = job ID)
 #BSUB -e error_cifar10_adamw_%J.txt     # Error output file (%J = job ID)
 
@@ -25,8 +25,8 @@ cd $HOME
 # Activate virtual environment if you have one
 source $HOME/ddpm_env/bin/activate
 
-# Run the training script
-python -m ddpm_dlpm.ddpm_cifar10.train_AdamW
+# Run the training script with torchrun for multi-GPU DDP
+torchrun --nproc_per_node=7 --nnodes=1 -m ddpm_dlpm_multigpu.ddpm_cifar10.train_AdamW
 
 # Print job completion info
 echo "=================================================="

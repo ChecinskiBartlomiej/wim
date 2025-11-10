@@ -2,7 +2,7 @@
 # LSF batch script to run batch size testing with image generation
 
 # Job parameters
-#BSUB -m A100              # Request A100 GPU node
+#BSUB -m comp01              # Request A100 GPU node
 #BSUB -q normal            # Queue type (normal for batch jobs)
 #BSUB -n 8                 # Number of CPU cores (for data loading)
 #BSUB -gpu num=1           # Request 1 GPU

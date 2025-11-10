@@ -234,7 +234,7 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     return fid
 
 
-def extract_inception_features(images, batch_size=50, device='cpu', pretrained_path=None):
+def extract_inception_features(images, batch_size=512, device='cpu', pretrained_path=None):
     """
     Extract InceptionV3 features from a batch of images.
 
@@ -273,7 +273,7 @@ def extract_inception_features(images, batch_size=50, device='cpu', pretrained_p
     return np.concatenate(all_features, axis=0)
 
 
-def load_real_images_for_fid(dataset, num_images, batch_size=128):
+def load_real_images_for_fid(dataset, num_images, batch_size=128, start_idx=0):
     """
     Load real images from dataset for FID calculation.
 
@@ -281,14 +281,15 @@ def load_real_images_for_fid(dataset, num_images, batch_size=128):
         dataset: PyTorch dataset (returns images in [-1, 1])
         num_images: Number of images to load
         batch_size: Batch size for loading (default: 128)
+        start_idx: Starting index in dataset (default: 0, for distributed loading)
 
     Returns:
         images: Tensor [B, C, H, W] in range [-1, 1]
     """
-    num_to_load = min(num_images, len(dataset))
+    num_to_load = min(num_images, len(dataset) - start_idx)
 
-    # Create subset of dataset (first num_to_load images)
-    subset = Subset(dataset, range(num_to_load))
+    # Create subset of dataset (from start_idx to start_idx + num_to_load)
+    subset = Subset(dataset, range(start_idx, start_idx + num_to_load))
 
     # Use DataLoader for efficient batched loading
     dataloader = DataLoader(subset, batch_size=batch_size, shuffle=False)
@@ -337,7 +338,7 @@ def generate_images_for_fid(diffusion, model, cfg, num_images):
 
     return torch.stack(generated_images)
 
-def calculate_fid(real_images, generated_images, batch_size=50, device='cpu', pretrained_path=None):
+def calculate_fid(real_images, generated_images, batch_size=512, device='cpu', pretrained_path=None):
     """
     Calculate Fréchet Inception Distance (FID) between real and generated images.
 
@@ -417,7 +418,7 @@ def calculate_fid_from_model(diffusion, model, dataset, cfg, device='cpu'):
     fid_score = calculate_fid(
         real_images,
         generated_images,
-        batch_size=50,
+        batch_size=512,
         device=device,
         pretrained_path=str(cfg.inception_path)
     )

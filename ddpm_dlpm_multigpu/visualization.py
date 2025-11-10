@@ -1,8 +1,3 @@
-"""
-Visualization utilities for plotting training metrics and generated images.
-General-purpose functions that work with any model/dataset.
-"""
-
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.gridspec import GridSpec
