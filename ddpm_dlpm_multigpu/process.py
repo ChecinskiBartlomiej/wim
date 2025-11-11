@@ -142,7 +142,7 @@ class DiffusionProcess(ABC):
                 if self.get_name() == "DDPM":
                     x_t = self.backward(x_t, t, noise_pred)
                 else:  # DLPM
-                    x_t = self.backward(x_t, t, noise_pred, a_samples, sigma_sq_all)
+                    x_t = self.backward(x_t, t, noise_pred, sigma_sq_all)
 
                 if return_intermediate and t % intermediate_step == 0:
                     intermediate_samples.append(x_t)
@@ -373,19 +373,17 @@ class DLPM(DiffusionProcess):
 
         return x_t
 
-    def backward(self, x_t, t, noise_prediction, a_samples, sigma_sq_all):
+    def backward(self, x_t, t, noise_prediction, sigma_sq_all):
         """
         Args:
             x_t: Noisy images at timestep t [batch_size, channels, height, width]
             t: Current timestep (scalar)
             noise_prediction: Predicted noise from model [batch_size, channels, height, width]
-            a_samples: alpha/2-stable random variables A_{1:T} [batch_size, T]
-            sigma_sq_all: Precomputed Σ1→t values [T, batch_size] for efficiency
+            sigma_sq_all: Precomputed sigma_sq_all values [T, batch_size] for efficiency
 
         Returns:
             x_{t-1}: Denoised images at previous timestep
         """
-        batch_size = x_t.shape[0]
         gamma_t = self.gammas[t]
         sigma_bar_t = self.sigma_bars[t]
 
@@ -397,6 +395,11 @@ class DLPM(DiffusionProcess):
             gamma_t_sq = gamma_t ** 2
             gamma_coeff = 1 - (gamma_t_sq * sigma_sq_1_to_t_minus_1) / sigma_sq_1_to_t
             variance_t_minus_1 = gamma_coeff * sigma_sq_1_to_t_minus_1
+
+            # Reshape for broadcasting with [batch_size, C, H, W]
+            gamma_coeff = gamma_coeff[:, None, None, None]
+            variance_t_minus_1 = variance_t_minus_1[:, None, None, None]
+
             gaussian_noise = torch.randn_like(x_t)
             noise_term = torch.sqrt(variance_t_minus_1) * gaussian_noise
 
@@ -447,7 +450,7 @@ class DLPM(DiffusionProcess):
 
     def get_noise(self, imgs, device):
         """Generate alpha-stable noise samples for training target"""
-        return torch.sqrt(self.sample_alpha_stable(size=(1, 1, 1, 1), device=device)) * torch.randn_like(imgs).to(device)
+        return torch.sqrt(self.sample_alpha_stable(size=(imgs.shape[0], 1, 1, 1), device=device)) * torch.randn_like(imgs).to(device)
 
     def get_loss(self):
         return lambda pred, target: torch.sqrt(torch.nn.functional.mse_loss(pred, target))
