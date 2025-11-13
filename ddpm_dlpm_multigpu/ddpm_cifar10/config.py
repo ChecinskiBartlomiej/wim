@@ -15,8 +15,8 @@ class CONFIG:
 
     use_horizontal_flip = True  
 
-    num_epochs = 3000
-    checkpoint_epochs = [100, 500, 1000, 1500, 2000, 2500, 3000]
+    num_epochs = 6000
+    checkpoint_epochs = [100, 500, 1000, 1500, 2000, 2500, 3000, 4500, 6000]
 
     num_timesteps = 1000
     batch_size = 192
@@ -46,13 +46,13 @@ class CONFIG:
 
     optimizer_configs = {
         "Adam": {
-            "lr": 2e-4,
+            "lr": 7e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 0
         },
         "AdamW": {
-            "lr": 2e-4,
+            "lr": 7e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 1e-2
@@ -62,4 +62,4 @@ class CONFIG:
     use_scheduler = False
 
     resume_checkpoint = None
-    #resume_checkpoint = "outputs/ddpm_cifar10/AdamW/checkpoints/checkpoint_epoch_3000.pth"
+    #resume_checkpoint = "outputs/ddpm_cifar10/AdamW/ddpm_unet_epoch_3000.pth"

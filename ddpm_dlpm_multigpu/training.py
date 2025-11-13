@@ -164,7 +164,7 @@ def train(cfg, optimizer_name="Adam"):
             print(f"{'='*70}")
             print(f"Checkpoint path: {cfg.resume_checkpoint}\n")
 
-        checkpoint = torch.load(cfg.resume_checkpoint, map_location=device)
+        checkpoint = torch.load(cfg.resume_checkpoint, map_location=device, weights_only=False)
 
         # Restore model, EMA, optimizer states
         model.module.load_state_dict(checkpoint['model_state_dict'])

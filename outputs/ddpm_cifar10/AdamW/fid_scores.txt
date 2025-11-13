@@ -1,0 +1,9 @@
+Epoch 100: FID = 2739.35
+Epoch 500: FID = 335.39
+Epoch 1000: FID = 68.48
+Epoch 1500: FID = 18.26
+Epoch 2000: FID = 12.70
+Epoch 2500: FID = 11.79
+Epoch 3000: FID = 12.99
+Epoch 4500: FID = 17.84
+Epoch 6000: FID = 21.32
