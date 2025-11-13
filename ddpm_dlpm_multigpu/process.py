@@ -15,13 +15,17 @@ class DiffusionProcess(ABC):
         pass
 
     @abstractmethod
-    def forward(self, x0, noise, t):
+    def forward(self, x_0, noise, t):
         """Forward diffusion process - add noise to clean images"""
         pass
 
     @abstractmethod
     def backward(self, x_t, t, noise_prediction):
         """Backward diffusion process - denoise images"""
+        pass
+
+    def backward_ddim(self, x_t, t, noise_prediction):
+        """Backward diffusion process - denoise images using DDIM strategy"""
         pass
 
     @abstractmethod
@@ -270,6 +274,41 @@ class DDPM(DiffusionProcess):
 
         # Compute x_{t-1}
         prev = (x_t - (beta_t / sqrt_one_minus_alpha_bar_t) * noise_prediction) / sqrt_alpha_t + sigma * epsilon
+
+        return prev
+    
+    def backward_ddim(self, cfg, x_t, t, noise_prediction):
+        """
+        DDIM backward step.
+        Uses a non-Markovian diffusion process that allows faster sampling by skipping timesteps.
+
+        Args:
+            cfg: Configuration object containing eta parameter (controls stochasticity)
+            x_t: Noisy images at timestep t [batch_size, channels, height, width]
+            t: Current timestep (scalar)
+            noise_prediction: Predicted noise from model [batch_size, channels, height, width]
+
+        Returns:
+            x_{t-1}: Denoised images at previous timestep 
+        """
+        
+        alpha_bar_t = self.alpha_bars[t]
+        sqrt_alpha_bar_t = self.sqrt_alpha_bars[t]
+        sqrt_one_minus_alpha_bar_t = self.sqrt_one_minus_alpha_bars[t]
+
+        x_0 = (x_t - sqrt_one_minus_alpha_bar_t * noise_prediction) / sqrt_alpha_bar_t
+
+        if t > 0:
+            alpha_bar_t_minus_one = self.alpha_bars[t-1]
+            sqrt_alpha_bar_t_minus_one = self.sqrt_alpha_bars[t-1]
+            sqrt_one_minus_alpha_bar_t_minus_one = self.sqrt_one_minus_alpha_bars[t-1]
+            sigma_t = cfg.eta * (sqrt_one_minus_alpha_bar_t_minus_one / sqrt_one_minus_alpha_bar_t) * torch.sqrt(1 - alpha_bar_t / alpha_bar_t_minus_one)
+        else:
+            return x_0
+
+        epsilon = torch.randn_like(x_t)
+
+        prev = sqrt_alpha_bar_t_minus_one * x_0 + torch.sqrt(1 - alpha_bar_t_minus_one - sigma_t ** 2) * noise_prediction + sigma_t * epsilon
 
         return prev
 
