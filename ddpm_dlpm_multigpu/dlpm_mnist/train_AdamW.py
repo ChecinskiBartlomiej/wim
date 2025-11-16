@@ -5,7 +5,7 @@ from ddpm_dlpm_multigpu.training import train
 
 if __name__ == "__main__":
     print("="*60)
-    print("Starting DLPM training with AdamW optimizer")
+    print("Starting DLPM training on MNIST with AdamW optimizer")
     print("="*60)
     print(f"Epochs: {CONFIG.num_epochs}")
     print(f"Batch size: {CONFIG.batch_size}")
@@ -13,6 +13,8 @@ if __name__ == "__main__":
     print(f"Weight decay: {CONFIG.optimizer_configs['AdamW']['weight_decay']}")
     print(f"Alpha (tail index): {CONFIG.alpha}")
     print(f"Timesteps: {CONFIG.num_timesteps}")
+    print(f"Image size: {CONFIG.img_size}x{CONFIG.img_size}")
+    print(f"Channels: {CONFIG.im_channels} (Grayscale)")
     print(f"Checkpoint epochs: {CONFIG.checkpoint_epochs}")
     print("="*60 + "\n")
 

@@ -492,5 +492,5 @@ class DLPM(DiffusionProcess):
         return torch.sqrt(self.sample_alpha_stable(size=(imgs.shape[0], 1, 1, 1), device=device)) * torch.randn_like(imgs).to(device)
 
     def get_loss(self):
-        return lambda pred, target: torch.sqrt(torch.nn.functional.mse_loss(pred, target))
+        return lambda pred, target: torch.sqrt(((pred - target) ** 2).sum(dim=(1, 2, 3))).mean()
 
