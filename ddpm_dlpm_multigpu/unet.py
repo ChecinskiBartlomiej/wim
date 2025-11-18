@@ -64,7 +64,7 @@ class SelfAttentionBlock(nn.Module):
         self,
         num_channels: int,
         num_groups: int = 8,
-        num_heads: int = 4,
+        num_heads: int = 1,
         norm: bool = True,
     ):
         super().__init__()
@@ -215,6 +215,7 @@ class DownC(nn.Module):
         num_layers: int = 2,
         down_sample: bool = True,
         dropout: float = 0.0,
+        use_attention: bool = True,
     ):
 
         super().__init__()
@@ -229,7 +230,10 @@ class DownC(nn.Module):
 
         self.te_block = nn.ModuleList([TimeEmbedding(out_channels, t_emb_dim) for _ in range(num_layers)])
 
-        self.attn_block = nn.ModuleList([SelfAttentionBlock(out_channels) for _ in range(num_layers)])
+        self.attn_block = nn.ModuleList([
+            SelfAttentionBlock(out_channels) if use_attention else nn.Identity()
+            for _ in range(num_layers)
+        ])
 
         self.down_block = Downsample(out_channels, out_channels) if down_sample else nn.Identity()
 
@@ -270,6 +274,7 @@ class MidC(nn.Module):
         t_emb_dim: int = 128,
         num_layers: int = 2,
         dropout: float = 0.0,
+        use_attention: bool = True,
     ):
 
         super().__init__()
@@ -284,7 +289,10 @@ class MidC(nn.Module):
 
         self.te_block = nn.ModuleList([TimeEmbedding(out_channels, t_emb_dim) for _ in range(num_layers + 1)])
 
-        self.attn_block = nn.ModuleList([SelfAttentionBlock(out_channels) for _ in range(num_layers)])
+        self.attn_block = nn.ModuleList([
+            SelfAttentionBlock(out_channels) if use_attention else nn.Identity()
+            for _ in range(num_layers)
+        ])
 
         self.res_block = nn.ModuleList(
             [
@@ -331,8 +339,9 @@ class UpC(nn.Module):
         num_layers: int = 2,
         up_sample: bool = True,
         dropout: float = 0.0,
+        use_attention: bool = True,
     ):
-    
+
 
         super().__init__()
 
@@ -346,7 +355,10 @@ class UpC(nn.Module):
 
         self.te_block = nn.ModuleList([TimeEmbedding(out_channels, t_emb_dim) for _ in range(num_layers)])
 
-        self.attn_block = nn.ModuleList([SelfAttentionBlock(out_channels) for _ in range(num_layers)])
+        self.attn_block = nn.ModuleList([
+            SelfAttentionBlock(out_channels) if use_attention else nn.Identity()
+            for _ in range(num_layers)
+        ])
 
         self.up_block = Upsample(in_channels, in_channels // 2) if up_sample else nn.Identity()
 
@@ -392,6 +404,8 @@ class Unet(nn.Module):
         num_midc_layers: int = 2,
         num_upc_layers: int = 2,
         dropout: float = 0.0,
+        img_size: int = 32,
+        attention_resolutions: list = [16],
     ):
 
         super().__init__()
@@ -406,6 +420,8 @@ class Unet(nn.Module):
         self.num_midc_layers = num_midc_layers
         self.num_upc_layers = num_upc_layers
         self.dropout = dropout
+        self.img_size = img_size
+        self.attention_resolutions = attention_resolutions
         self.up_sample = list(reversed(self.down_sample))
 
         self.cv1 = nn.Conv2d(self.im_channels, self.down_ch[0], kernel_size=3, padding=1)
@@ -418,8 +434,12 @@ class Unet(nn.Module):
             nn.Linear(self.t_proj_dim, self.t_proj_dim),
         )
 
-        self.downs = nn.ModuleList(
-            [
+        # Build down blocks with attention flags based on resolution
+        current_res = self.img_size
+        downs_list = []
+        for i in range(len(self.down_ch) - 1):
+            use_attention = current_res in self.attention_resolutions
+            downs_list.append(
                 DownC(
                     self.down_ch[i],
                     self.down_ch[i + 1],
@@ -427,26 +447,36 @@ class Unet(nn.Module):
                     self.num_downc_layers,
                     self.down_sample[i],
                     self.dropout,
+                    use_attention,
                 )
-                for i in range(len(self.down_ch) - 1)
-            ]
-        )
+            )
+            if self.down_sample[i]:
+                current_res = current_res // 2
+        self.downs = nn.ModuleList(downs_list)
 
-        self.mids = nn.ModuleList(
-            [
+        # Build mid blocks (at current resolution after all downs)
+        use_attention = current_res in self.attention_resolutions
+        mids_list = []
+        for i in range(len(self.mid_ch) - 1):
+            mids_list.append(
                 MidC(
                     self.mid_ch[i],
                     self.mid_ch[i + 1],
                     self.t_proj_dim,
                     self.num_midc_layers,
                     self.dropout,
+                    use_attention,
                 )
-                for i in range(len(self.mid_ch) - 1)
-            ]
-        )
+            )
+        self.mids = nn.ModuleList(mids_list)
 
-        self.ups = nn.ModuleList(
-            [
+        # Build up blocks (upsample happens first, then process at that resolution)
+        ups_list = []
+        for i in range(len(self.up_ch) - 1):
+            if self.up_sample[i]:
+                current_res = current_res * 2
+            use_attention = current_res in self.attention_resolutions
+            ups_list.append(
                 UpC(
                     self.up_ch[i],
                     self.up_ch[i + 1],
@@ -454,10 +484,10 @@ class Unet(nn.Module):
                     self.num_upc_layers,
                     self.up_sample[i],
                     self.dropout,
+                    use_attention,
                 )
-                for i in range(len(self.up_ch) - 1)
-            ]
-        )
+            )
+        self.ups = nn.ModuleList(ups_list)
 
         self.cv2 = nn.Sequential(
             nn.GroupNorm(8, self.up_ch[-1]),

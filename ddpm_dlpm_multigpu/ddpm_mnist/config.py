@@ -18,8 +18,8 @@ class CONFIG:
     diffusion = DDPM  
  
     # Training parameters
-    num_epochs = 750
-    checkpoint_epochs = [75, 150, 225, 300, 375, 450, 525, 600, 675, 750]
+    num_epochs = 3000
+    checkpoint_epochs = [3000]
     num_timesteps = 1000
     batch_size = 192
     num_workers = 4  # Number of DataLoader workers per GPU
@@ -32,7 +32,7 @@ class CONFIG:
     denoising_timestep_interval = 40  # Save image every N timesteps (1000/40 = 25 timesteps)
 
     # FID calculation settings
-    num_fid_images = 1280  # Number of images for FID calculation (5000 for testing, 50000 for final)
+    num_fid_images = 10000  # Number of images for FID calculation (5000 for testing, 50000 for final)
     inception_path = Path("pretrained_models/inception_v3_imagenet.pth")
     fid_batch_size = 64
 
@@ -46,6 +46,7 @@ class CONFIG:
     unet_num_upc_layers = 2
     unet_t_emb_dim = 128
     unet_dropout = 0.0  # No dropout for MNIST
+    unet_attention_resolutions = [14] 
 
     # Optimizer configurations
     optimizer_configs = {

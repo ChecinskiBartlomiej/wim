@@ -15,7 +15,7 @@ class CONFIG:
     use_horizontal_flip = False
 
     num_epochs = 3000
-    checkpoint_epochs = []
+    checkpoint_epochs = [3000]
 
     train_data_path = data_dir / "train.csv"
 
@@ -31,7 +31,7 @@ class CONFIG:
 
     denoising_timestep_interval = 40  
 
-    num_fid_images = 5000  
+    num_fid_images = 10000  
     fid_batch_size = 128
     inception_path = Path("pretrained_models/inception_v3_imagenet.pth")
 
@@ -44,6 +44,7 @@ class CONFIG:
     unet_num_upc_layers = 2
     unet_t_emb_dim = 128
     unet_dropout = 0.0  # No dropout for MNIST
+    net_attention_resolutions = [14] 
 
     num_workers = 4
 

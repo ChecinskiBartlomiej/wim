@@ -40,7 +40,8 @@ class CONFIG:
     unet_num_midc_layers = 2
     unet_num_upc_layers = 2
     unet_t_emb_dim = 128
-    unet_dropout = 0.1  
+    unet_dropout = 0.1
+    unet_attention_resolutions = [16]  
 
     num_workers = 4 
 

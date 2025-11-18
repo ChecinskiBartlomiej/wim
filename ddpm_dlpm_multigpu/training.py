@@ -104,6 +104,8 @@ def train(cfg, optimizer_name="Adam"):
         num_midc_layers=cfg.unet_num_midc_layers,
         num_upc_layers=cfg.unet_num_upc_layers,
         dropout=cfg.unet_dropout,
+        img_size=cfg.img_size,
+        attention_resolutions=cfg.unet_attention_resolutions,
     ).to(device)
     
     model = DDP(model, device_ids=[rank])
