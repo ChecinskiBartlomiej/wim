@@ -224,25 +224,30 @@ def calculate_fid_from_model_distributed(diffusion, model, dataset, cfg, rank, w
         print(f"{'='*70}\n")
         print(f"Using {world_size} GPUs for parallel generation and feature extraction")
 
-    # Calculate how many images each GPU should process
-    images_per_gpu = cfg.num_fid_images // world_size
+    # Adjust num_fid_images to be divisible by world_size (required for gather)
     remainder = cfg.num_fid_images % world_size
+    actual_num_fid_images = cfg.num_fid_images - remainder
 
-    # Rank 0 handles the remainder
+    if rank == 0 and remainder > 0:
+        print(f"Adjusting num_fid_images from {cfg.num_fid_images} to {actual_num_fid_images}")
+        print(f"(must be divisible by {world_size} GPUs for distributed gather)\n")
+
+    # Calculate how many images each GPU should process (now evenly divisible)
+    images_per_gpu = actual_num_fid_images // world_size
+
+    # All ranks process the same number of images
+    my_num_images = images_per_gpu
+
     if rank == 0:
-        my_num_images = images_per_gpu + remainder
-        print(f"Rank 0 will generate {my_num_images} images (includes remainder)")
-        print(f"Other ranks will generate {images_per_gpu} images each")
-        print(f"Total: {cfg.num_fid_images} images\n")
-    else:
-        my_num_images = images_per_gpu
+        print(f"Each rank will generate {images_per_gpu} images")
+        print(f"Total: {actual_num_fid_images} images\n")
 
-    # Load real images - each rank loads its portion
-    start_idx = rank * images_per_gpu + (remainder if rank > 0 else 0)
+    # Load real images - each rank loads its portion (evenly distributed)
+    start_idx = rank * images_per_gpu
     end_idx = start_idx + my_num_images
 
     if rank == 0:
-        print(f"Loading real images (rank {rank}: indices {start_idx} to {end_idx})...")
+        print(f"Loading real images (rank {rank}: indices {start_idx} to {end_idx-1})...")
 
     real_images = load_real_images_for_fid(dataset, my_num_images, start_idx=start_idx).to(device)
 
@@ -297,13 +302,9 @@ def calculate_fid_from_model_distributed(diffusion, model, dataset, cfg, rank, w
         print(f"\nGathering features from all {world_size} GPUs to rank 0...")
 
         # Prepare lists to receive features from all ranks
+        # All ranks have the same size now (images_per_gpu), so all buffers are identical
         all_real_features = [torch.zeros_like(real_features_tensor) for _ in range(world_size)]
         all_gen_features = [torch.zeros_like(gen_features_tensor) for _ in range(world_size)]
-
-        # Adjust size for rank 0 if it has remainder
-        if remainder > 0:
-            all_real_features[0] = torch.zeros(my_num_images, real_features_tensor.shape[1], device=device)
-            all_gen_features[0] = torch.zeros(my_num_images, gen_features_tensor.shape[1], device=device)
     else:
         all_real_features = None
         all_gen_features = None

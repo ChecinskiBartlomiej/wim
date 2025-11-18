@@ -4,40 +4,37 @@ from ddpm_dlpm_multigpu.process import DLPM
 
 
 class CONFIG:
-    # Base directories
+
     data_dir = Path("data/mnist")
     model_dir = Path("outputs/dlpm_mnist")
     outputs_dir = Path("outputs/dlpm_mnist")
 
-    # Dataset configuration
-    train_data_path = data_dir / "train.csv"
-    dataset_class = CustomMnistDataset
-    use_horizontal_flip = False  # No horizontal flips for MNIST
-
-    # Diffusion process configuration
     diffusion = DLPM
-    alpha = 1.7  # Tail index for alpha-stable distribution (1 < alpha <= 2)
+    dataset_class = CustomMnistDataset
 
-    # Training parameters
-    num_epochs = 100
-    checkpoint_epochs = [20, 40, 60, 80, 100]
+    use_horizontal_flip = False
+
+    num_epochs = 3000
+    checkpoint_epochs = []
+
+    train_data_path = data_dir / "train.csv"
+
+    alpha = 1.7  
+  
     num_timesteps = 1000
-    batch_size = 128
-    num_workers = 4  # Number of DataLoader workers per GPU
+    batch_size = 192
     img_size = 28
     im_channels = 1
-    num_img_to_generate = 25  # Changed to 25 for 5x5 grid
-    cmap = "gray"  # Colormap for visualization
+    num_img_to_generate = 25  
 
-    # Denoising progress visualization
-    denoising_timestep_interval = 40  # Save image every N timesteps (1000/40 = 25 timesteps)
+    cmap = "gray"  
 
-    # FID calculation settings
-    num_fid_images = 5000  # Number of images for FID calculation (5000 for testing, 50000 for final)
+    denoising_timestep_interval = 40  
+
+    num_fid_images = 5000  
+    fid_batch_size = 128
     inception_path = Path("pretrained_models/inception_v3_imagenet.pth")
-    fid_batch_size = 64
 
-    # U-Net architecture (4 levels, smaller model for MNIST)
     unet_down_ch = [32, 64, 128, 256]
     unet_mid_ch = [256, 256, 128]
     unet_up_ch = [256, 128, 64, 16]
@@ -48,18 +45,26 @@ class CONFIG:
     unet_t_emb_dim = 128
     unet_dropout = 0.0  # No dropout for MNIST
 
-    # Optimizer configurations
+    num_workers = 4
+
     optimizer_configs = {
         "Adam": {
-            "lr": 2e-4,
+            "lr": 6e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 0
         },
         "AdamW": {
-            "lr": 2e-4,
+            "lr": 6e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 1e-2
         }
     }
+
+    use_scheduler = False
+
+    resume_checkpoint = None
+    #resume_checkpoint = "outputs/ddpm_cifar10/AdamW/ddpm_unet_epoch_3000.pth"
+
+    eta = 0
