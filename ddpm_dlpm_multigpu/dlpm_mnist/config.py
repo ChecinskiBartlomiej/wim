@@ -8,6 +8,7 @@ class CONFIG:
     data_dir = Path("data/mnist")
     model_dir = Path("outputs/dlpm_mnist")
     outputs_dir = Path("outputs/dlpm_mnist")
+    train_data_path = data_dir / "train.csv"
 
     diffusion = DLPM
     dataset_class = CustomMnistDataset
@@ -16,9 +17,7 @@ class CONFIG:
 
     num_epochs = 3000
     checkpoint_epochs = [3000]
-
-    train_data_path = data_dir / "train.csv"
-
+    
     alpha = 1.7  
   
     num_timesteps = 1000

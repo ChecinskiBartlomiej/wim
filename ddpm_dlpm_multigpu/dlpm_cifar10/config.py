@@ -66,5 +66,4 @@ class CONFIG:
 
     resume_checkpoint = None
     #resume_checkpoint = "outputs/ddpm_cifar10/AdamW/ddpm_unet_epoch_3000.pth"
-
-    #eta = 0 for DDIM
+    eta = 0 
