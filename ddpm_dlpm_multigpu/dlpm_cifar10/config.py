@@ -15,8 +15,8 @@ class CONFIG:
 
     use_horizontal_flip = True
 
-    num_epochs = 6000
-    checkpoint_epochs = [100, 500, 1000, 1500, 2000, 2500, 3000, 4500, 6000]
+    num_epochs = 4000
+    checkpoint_epochs = [100, 500, 1000, 1500, 2000, 2500, 3000, 4000]
 
     alpha = 1.7  
 

@@ -15,8 +15,8 @@ class CONFIG:
 
     use_horizontal_flip = True  
 
-    num_epochs = 10000
-    checkpoint_epochs = [100, 500, 1000, 1500, 2000, 2500, 3000, 4500, 6000, 8000, 10000]
+    num_epochs = 4000
+    checkpoint_epochs = [100, 500, 1000, 1500, 2000, 2500, 3000, 4000]
 
     num_timesteps = 1000
     batch_size = 192
