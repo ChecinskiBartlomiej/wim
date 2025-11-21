@@ -42,20 +42,20 @@ class CONFIG:
     unet_num_midc_layers = 2
     unet_num_upc_layers = 2
     unet_t_emb_dim = 128
-    unet_dropout = 0.0  # No dropout for MNIST
-    net_attention_resolutions = [14] 
+    unet_dropout = 0.0  
+    unet_attention_resolutions = [14] 
 
     num_workers = 4
 
     optimizer_configs = {
         "Adam": {
-            "lr": 6e-4,
+            "lr": 5e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 0
         },
         "AdamW": {
-            "lr": 6e-4,
+            "lr": 5e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 1e-2

@@ -47,13 +47,13 @@ class CONFIG:
 
     optimizer_configs = {
         "Adam": {
-            "lr": 6e-4,
+            "lr": 5e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 0
         },
         "AdamW": {
-            "lr": 6e-4,
+            "lr": 5e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 1e-2

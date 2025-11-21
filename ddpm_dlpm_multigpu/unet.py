@@ -2,6 +2,13 @@ import torch
 import torch.nn as nn
 
 
+class ZeroBlock(nn.Module):
+    """Returns zero tensor with same shape as input - for skipping attention in residual connections"""
+
+    def forward(self, x):
+        return torch.zeros_like(x)
+
+
 def get_time_embedding(time_steps: torch.Tensor, t_emb_dim: int):
     """Embed time into higher diemnsional space using sines and cosines"""
 
@@ -231,7 +238,7 @@ class DownC(nn.Module):
         self.te_block = nn.ModuleList([TimeEmbedding(out_channels, t_emb_dim) for _ in range(num_layers)])
 
         self.attn_block = nn.ModuleList([
-            SelfAttentionBlock(out_channels) if use_attention else nn.Identity()
+            SelfAttentionBlock(out_channels) if use_attention else ZeroBlock()
             for _ in range(num_layers)
         ])
 
@@ -290,7 +297,7 @@ class MidC(nn.Module):
         self.te_block = nn.ModuleList([TimeEmbedding(out_channels, t_emb_dim) for _ in range(num_layers + 1)])
 
         self.attn_block = nn.ModuleList([
-            SelfAttentionBlock(out_channels) if use_attention else nn.Identity()
+            SelfAttentionBlock(out_channels) if use_attention else ZeroBlock()
             for _ in range(num_layers)
         ])
 
@@ -356,7 +363,7 @@ class UpC(nn.Module):
         self.te_block = nn.ModuleList([TimeEmbedding(out_channels, t_emb_dim) for _ in range(num_layers)])
 
         self.attn_block = nn.ModuleList([
-            SelfAttentionBlock(out_channels) if use_attention else nn.Identity()
+            SelfAttentionBlock(out_channels) if use_attention else ZeroBlock()
             for _ in range(num_layers)
         ])
 

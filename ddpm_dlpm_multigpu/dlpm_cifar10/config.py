@@ -43,19 +43,19 @@ class CONFIG:
     unet_num_upc_layers = 2
     unet_t_emb_dim = 128
     unet_dropout = 0.1 
-    net_attention_resolutions = [16] 
+    unet_attention_resolutions = [16] 
 
     num_workers = 4
 
     optimizer_configs = {
         "Adam": {
-            "lr": 7e-4,
+            "lr": 5e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 0
         },
         "AdamW": {
-            "lr": 7e-4,
+            "lr": 5e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 1e-2
