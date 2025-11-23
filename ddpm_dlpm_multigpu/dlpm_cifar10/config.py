@@ -30,7 +30,7 @@ class CONFIG:
 
     denoising_timestep_interval = 40 
 
-    num_fid_images = 50000
+    num_fid_images = 28000
     fid_batch_size = 128
     inception_path = Path("pretrained_models/inception_v3_imagenet.pth")
 
