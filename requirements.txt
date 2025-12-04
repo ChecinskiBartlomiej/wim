@@ -6,4 +6,4 @@ pandas
 matplotlib
 tqdm
 jupyterlab
-
+ipykernel
