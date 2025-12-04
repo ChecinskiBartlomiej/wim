@@ -25,6 +25,10 @@ cd $HOME
 # Activate virtual environment if you have one
 source $HOME/ddpm_env/bin/activate
 
+# Set CPU threads per GPU process to match job allocation (7 cores per GPU)
+# By default torchrun sets OMP_NUM_THREADS=1, but we have 28 cores allocated
+export OMP_NUM_THREADS=7
+
 # Run the training script with torchrun for multi-GPU DDP
 torchrun --nproc_per_node=4 --nnodes=1 -m ddpm_dlpm_multigpu.ddpm_cifar10.train_AdamW
 

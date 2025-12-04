@@ -42,14 +42,15 @@ def create_warmup_scheduler(optimizer, warmup_epochs=15, start_factor=0.2):
 
 def train(cfg, optimizer_name="Adam"):
 
-    # Initialize distributed training
-    dist.init_process_group(backend='nccl')
-    rank = dist.get_rank()
-    world_size = dist.get_world_size()
-
-    # Set device for this process
+    # Get rank from environment and set device BEFORE initializing process group
+    # This ensures NCCL knows the exact GPU mapping from the start
+    rank = int(os.environ['LOCAL_RANK'])
     torch.cuda.set_device(rank)
     device = torch.device(f'cuda:{rank}')
+
+    # Initialize distributed training
+    dist.init_process_group(backend='nccl')
+    world_size = dist.get_world_size()
 
     # Only rank 0 prints and creates directories
     if rank == 0:

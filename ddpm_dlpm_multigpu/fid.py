@@ -92,7 +92,7 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     return fid
 
 
-def extract_inception_features(images, batch_size=512, device='cpu', pretrained_path=None):
+def extract_inception_features(images, batch_size=512, device='cpu', pretrained_path=None, rank=0):
     """
     Extract InceptionV3 features from a batch of images.
 
@@ -101,6 +101,7 @@ def extract_inception_features(images, batch_size=512, device='cpu', pretrained_
         batch_size: Batch size for processing
         device: Device to use ('cpu' or 'cuda')
         pretrained_path: Path to pretrained InceptionV3 weights (for offline use)
+        rank: Process rank (default: 0) - only rank 0 shows progress bar
 
     Returns:
         features: [B, 2048] feature array
@@ -120,10 +121,14 @@ def extract_inception_features(images, batch_size=512, device='cpu', pretrained_
     dataset = TensorDataset(images)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
-    # Extract features
+    # Extract features - only show progress bar on rank 0
     all_features = []
+    iterator = dataloader
+    if rank == 0:
+        iterator = tqdm(dataloader, desc="Extracting features")
+
     with torch.no_grad():
-        for batch in tqdm(dataloader, desc="Extracting features"):
+        for batch in iterator:
             batch_images = batch[0].to(device)
             features = feature_extractor(batch_images)
             all_features.append(features.cpu().numpy())
@@ -131,7 +136,7 @@ def extract_inception_features(images, batch_size=512, device='cpu', pretrained_
     return np.concatenate(all_features, axis=0)
 
 
-def load_real_images_for_fid(dataset, num_images, batch_size=128, start_idx=0):
+def load_real_images_for_fid(dataset, num_images, batch_size=128, start_idx=0, rank=0):
     """
     Load real images from dataset for FID calculation.
 
@@ -140,6 +145,7 @@ def load_real_images_for_fid(dataset, num_images, batch_size=128, start_idx=0):
         num_images: Number of images to load
         batch_size: Batch size for loading (default: 128)
         start_idx: Starting index in dataset (default: 0, for distributed loading)
+        rank: Process rank (default: 0) - only rank 0 shows progress bar
 
     Returns:
         images: Tensor [B, C, H, W] in range [-1, 1]
@@ -149,16 +155,20 @@ def load_real_images_for_fid(dataset, num_images, batch_size=128, start_idx=0):
     # Create subset of dataset (from start_idx to start_idx + num_to_load)
     subset = Subset(dataset, range(start_idx, start_idx + num_to_load))
 
-    # Load images in batches
+    # Load images in batches - only show progress bar on rank 0
     dataloader = DataLoader(subset, batch_size=batch_size, shuffle=False)
     real_images = []
-    for batch in tqdm(dataloader, desc="Loading real images"):
+    iterator = dataloader
+    if rank == 0:
+        iterator = tqdm(dataloader, desc="Loading real images")
+
+    for batch in iterator:
         real_images.append(batch)
 
     return torch.cat(real_images, dim=0)
 
 
-def generate_images_for_fid(diffusion, model, cfg, num_images):
+def generate_images_for_fid(diffusion, model, cfg, num_images, rank=0):
     """
     Generate images from diffusion model for FID calculation.
 
@@ -167,6 +177,7 @@ def generate_images_for_fid(diffusion, model, cfg, num_images):
         model: Trained U-Net model (should be in eval mode)
         cfg: Configuration object (must have fid_batch_size attribute)
         num_images: Number of images to generate
+        rank: Process rank (default: 0) - only rank 0 shows progress bar
 
     Returns:
         images: Tensor [B, C, H, W] in range [-1, 1]
@@ -178,8 +189,12 @@ def generate_images_for_fid(diffusion, model, cfg, num_images):
     num_full_batches = num_images // batch_size
     remainder = num_images % batch_size
 
-    # Generate full batches
-    for i in tqdm(range(num_full_batches), desc="Generating images for FID"):
+    # Generate full batches - only show progress bar on rank 0
+    iterator = range(num_full_batches)
+    if rank == 0:
+        iterator = tqdm(iterator, desc="Generating images for FID")
+
+    for i in iterator:
         samples = diffusion.generate_samples(cfg, model, return_intermediate=False, batch_size=batch_size)
 
         # Split batch into individual images: [batch_size, C, H, W] -> list of [C, H, W]
@@ -249,7 +264,7 @@ def calculate_fid_from_model_distributed(diffusion, model, dataset, cfg, rank, w
     if rank == 0:
         print(f"Loading real images (rank {rank}: indices {start_idx} to {end_idx-1})...")
 
-    real_images = load_real_images_for_fid(dataset, my_num_images, start_idx=start_idx).to(device)
+    real_images = load_real_images_for_fid(dataset, my_num_images, start_idx=start_idx, rank=rank).to(device)
 
     if rank == 0:
         print(f"Rank {rank} loaded {len(real_images)} real images")
@@ -260,7 +275,7 @@ def calculate_fid_from_model_distributed(diffusion, model, dataset, cfg, rank, w
 
     model.eval()
     with torch.no_grad():
-        generated_images = generate_images_for_fid(diffusion, model, cfg, my_num_images)
+        generated_images = generate_images_for_fid(diffusion, model, cfg, my_num_images, rank=rank)
         generated_images = generated_images.to(device)
 
     if rank == 0:
@@ -274,7 +289,8 @@ def calculate_fid_from_model_distributed(diffusion, model, dataset, cfg, rank, w
         real_images,
         batch_size=512,
         device=device,
-        pretrained_path=str(cfg.inception_path)
+        pretrained_path=str(cfg.inception_path),
+        rank=rank
     )
 
     if rank == 0:
@@ -284,7 +300,8 @@ def calculate_fid_from_model_distributed(diffusion, model, dataset, cfg, rank, w
         generated_images,
         batch_size=512,
         device=device,
-        pretrained_path=str(cfg.inception_path)
+        pretrained_path=str(cfg.inception_path),
+        rank=rank
     )
 
     if rank == 0:

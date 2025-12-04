@@ -16,7 +16,7 @@ class CONFIG:
     use_horizontal_flip = True
 
     num_epochs = 4000
-    checkpoint_epochs = [100, 500, 1000, 1500, 2000, 2500, 3000, 4000]
+    checkpoint_epochs = [4000]
 
     alpha = 1.7  
 
@@ -49,13 +49,13 @@ class CONFIG:
 
     optimizer_configs = {
         "Adam": {
-            "lr": 5e-4,
+            "lr": 4e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 0
         },
         "AdamW": {
-            "lr": 5e-4,
+            "lr": 4e-4,
             "betas": (0.9, 0.999),
             "eps": 1e-8,
             "weight_decay": 1e-2

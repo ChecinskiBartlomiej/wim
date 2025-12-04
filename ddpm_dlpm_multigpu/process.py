@@ -449,7 +449,7 @@ class DLPM(DiffusionProcess):
             gamma_coeff = 1
             noise_term = 0
 
-        prev = (x_t - gamma_coeff * sigma_bar_t * noise_prediction) / gamma_t + noise_term
+        prev = x_t / gamma_t - gamma_coeff * sigma_bar_t * noise_prediction + noise_term
 
         return prev
 
