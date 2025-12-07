@@ -133,8 +133,9 @@ class DiffusionProcess(ABC):
 
         # Sample noise for DLPM and precompute sigma_sq_all
         if self.get_name() == "DLPM":
-            a_samples = self.sample_alpha_stable(size=(batch_size, cfg.num_timesteps), device=device)
-            x_t = self.sigma_bars[-1] * torch.sqrt(self.sample_alpha_stable(size=(batch_size, 1, 1, 1), device=device)) * torch.randn(batch_size, cfg.im_channels, cfg.img_size, cfg.img_size, device=device)
+            clamp_a = getattr(cfg, 'clamp_a', None)
+            a_samples = self.sample_alpha_stable(size=(batch_size, cfg.num_timesteps), device=device, clamp_a=clamp_a)
+            x_t = self.sigma_bars[-1] * torch.sqrt(self.sample_alpha_stable(size=(batch_size, 1, 1, 1), device=device, clamp_a=clamp_a)) * torch.randn(batch_size, cfg.im_channels, cfg.img_size, cfg.img_size, device=device)
             sigma_sq_all = self._precompute_all_sigma_sq(a_samples, device)
 
         intermediate_samples = []
@@ -328,7 +329,7 @@ class DDPM(DiffusionProcess):
     def get_name(self):
         return "DDPM"
 
-    def get_noise(self, imgs, device):
+    def get_noise(self, imgs, device, clamp_a=None):
         return torch.randn_like(imgs).to(device)
 
     def get_loss(self):
@@ -371,13 +372,14 @@ class DLPM(DiffusionProcess):
 
         return torch.clip(betas, 0.001, 0.999)
 
-    def sample_alpha_stable(self, size, device='cpu'):
+    def sample_alpha_stable(self, size, device='cpu', clamp_a=None):
         """
         Sample from alpha/2-stable distribution using scipy.
 
         Args:
             size: Tuple specifying the shape of samples (e.g., (batch_size, timesteps)
             device: torch device
+            clamp_a: Maximum value to clamp samples (None = no clamping)
 
         Returns:
             samples: Tensor of alpha/2-stable samples with the specified shape
@@ -392,7 +394,12 @@ class DLPM(DiffusionProcess):
         # scale: scale parameter (c_A)
         samples = levy_stable.rvs(alpha_half, beta=1, loc=0, scale=c_A, size=size)
 
-        return torch.tensor(samples, dtype=torch.float32, device=device)
+        samples = torch.tensor(samples, dtype=torch.float32, device=device)
+
+        if clamp_a is not None:
+            samples = torch.clamp(samples, max=clamp_a)
+
+        return samples
 
     def forward(self, x_0, noise, t):
         """
@@ -449,7 +456,7 @@ class DLPM(DiffusionProcess):
             gamma_coeff = 1
             noise_term = 0
 
-        prev = x_t / gamma_t - gamma_coeff * sigma_bar_t * noise_prediction + noise_term
+        prev = (x_t - gamma_coeff * sigma_bar_t * noise_prediction) / gamma_t + noise_term
 
         return prev
 
@@ -489,9 +496,9 @@ class DLPM(DiffusionProcess):
         """Return the name of the diffusion process"""
         return "DLPM"
 
-    def get_noise(self, imgs, device):
+    def get_noise(self, imgs, device, clamp_a=None):
         """Generate alpha-stable noise samples for training target"""
-        return torch.sqrt(self.sample_alpha_stable(size=(imgs.shape[0], 1, 1, 1), device=device)) * torch.randn_like(imgs).to(device)
+        return torch.sqrt(self.sample_alpha_stable(size=(imgs.shape[0], 1, 1, 1), device=device, clamp_a=clamp_a)) * torch.randn_like(imgs).to(device)
 
     def get_loss(self):
         return lambda pred, target: torch.sqrt(((pred - target) ** 2).sum(dim=(1, 2, 3))).mean()

@@ -16,7 +16,8 @@ class CONFIG:
     use_horizontal_flip = True  
 
     num_epochs = 4000
-    checkpoint_epochs = [100, 500, 1000, 1500, 2000, 2500, 3000, 4000]
+    image_checkpoint_epochs = [100, 500, 1000, 1500, 2000, 2500, 3000, 4000]  # Generate sample images only
+    fid_checkpoint_epochs = [4000]  # Generate images + calculate FID
 
     num_timesteps = 1000
     batch_size = 192
@@ -64,5 +65,10 @@ class CONFIG:
 
     resume_checkpoint = None
     #resume_checkpoint = "outputs/ddpm_cifar10/AdamW/ddpm_unet_epoch_3000.pth"
-    eta = 0 
+    eta = 0
+
+    # Clamping and gradient clipping (not needed for DDPM)
+    clamp_a = None
+    clamp_eps = None
+    grad_clip = None
 

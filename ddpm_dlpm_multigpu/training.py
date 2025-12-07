@@ -225,14 +225,23 @@ def train(cfg, optimizer_name="Adam"):
 
             # Do forward and make prediction of noise added, calculate loss and gradients
             imgs = imgs.to(device)
-            noise = diffusion.get_noise(imgs, device)
+            noise = diffusion.get_noise(imgs, device, clamp_a=cfg.clamp_a)
             t = torch.randint(0, cfg.num_timesteps, (imgs.shape[0],)).to(device)
             noisy_imgs = diffusion.forward(imgs, noise, t)
             optimizer.zero_grad()
             noise_pred = model(noisy_imgs, t)
+
+            # Clamp noise predictions if clamp_eps is set (DLPM stability)
+            if cfg.clamp_eps is not None:
+                noise_pred = torch.clamp(noise_pred, -cfg.clamp_eps, cfg.clamp_eps)
+
             loss = criterion(noise_pred, noise)
             losses.append(loss.item())
             loss.backward()
+
+            # Gradient clipping if grad_clip is set (DLPM stability)
+            if cfg.grad_clip is not None:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
 
             # Collect gradient statistics
             grad_stats = collect_gradient_stats(model.module, thresholds=grad_thresholds)
@@ -303,12 +312,12 @@ def train(cfg, optimizer_name="Adam"):
         # Synchronize all ranks after epoch statistics gathering
         dist.barrier()
 
-        # Check if this is a checkpoint epoch
-        if (epoch + 1) in cfg.checkpoint_epochs:
-            # Only rank 0 generates images, and saves checkpoints (there is only 25 images to generate so it is okay)
+        # Check if this is an image checkpoint epoch
+        if (epoch + 1) in cfg.image_checkpoint_epochs:
+            # Only rank 0 generates images and saves checkpoints
             if rank == 0:
                 print(f"\n{'='*60}")
-                print(f"Checkpoint at epoch {epoch+1} - Generating images...")
+                print(f"Image checkpoint at epoch {epoch+1} - Generating images...")
                 print(f"{'='*60}\n")
 
                 checkpoint_model_path = optimizer_model_dir / f"ddpm_unet_epoch_{epoch+1}.pth"
@@ -335,7 +344,7 @@ def train(cfg, optimizer_name="Adam"):
 
                 # Generate all images at once with intermediate steps (batch generation), use EMA weights for generation
                 model.eval()
-                ema.apply_shadow(model.module)  
+                ema.apply_shadow(model.module)
                 with torch.no_grad():
 
                     all_intermediate_images, all_timesteps = diffusion.generate(
@@ -395,6 +404,13 @@ def train(cfg, optimizer_name="Adam"):
 
             # Synchronize gpus
             dist.barrier()
+
+        # Check if this is a FID checkpoint epoch
+        if (epoch + 1) in cfg.fid_checkpoint_epochs:
+            if rank == 0:
+                print(f"\n{'='*60}")
+                print(f"FID checkpoint at epoch {epoch+1} - Calculating FID...")
+                print(f"{'='*60}\n")
 
             # Calculate FID score using ALL GPUs, use EMA weights for generation of images
             model.eval()
