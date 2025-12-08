@@ -90,6 +90,7 @@ def train(cfg, optimizer_name="Adam"):
         print(f"Effective batch size: {cfg.batch_size * world_size}")
 
     # Create diffusion process (DDPM/DLPM) and get its loss function
+    diffusion_name = cfg.diffusion.__name__.lower()
     diffusion = cfg.diffusion().to(device)
     criterion = diffusion.get_loss()
 
@@ -110,7 +111,7 @@ def train(cfg, optimizer_name="Adam"):
     ).to(device)
     
     model = DDP(model, device_ids=[rank])
-    model_path = optimizer_model_dir / "ddpm_unet.pth"
+    model_path = optimizer_model_dir / f"{diffusion_name}_unet.pth"
 
     # Count and display model parameters
     if rank == 0:
@@ -320,7 +321,7 @@ def train(cfg, optimizer_name="Adam"):
                 print(f"Image checkpoint at epoch {epoch+1} - Generating images...")
                 print(f"{'='*60}\n")
 
-                checkpoint_model_path = optimizer_model_dir / f"ddpm_unet_epoch_{epoch+1}.pth"
+                checkpoint_model_path = optimizer_model_dir / f"{diffusion_name}_unet_epoch_{epoch+1}.pth"
                 checkpoint_dict = {
                     'model_state_dict': model.module.state_dict(),
                     'ema_state_dict': ema.state_dict(),

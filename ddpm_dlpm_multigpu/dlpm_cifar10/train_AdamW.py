@@ -15,7 +15,8 @@ if __name__ == "__main__":
     print(f"Timesteps: {CONFIG.num_timesteps}")
     print(f"Image size: {CONFIG.img_size}x{CONFIG.img_size}")
     print(f"Channels: {CONFIG.im_channels} (RGB)")
-    print(f"Checkpoint epochs: {CONFIG.checkpoint_epochs}")
+    print(f"Image checkpoint epochs: {CONFIG.image_checkpoint_epochs}")
+    print(f"FID checkpoint epochs: {CONFIG.fid_checkpoint_epochs}")
     print("="*60 + "\n")
 
     train(CONFIG, optimizer_name="AdamW")

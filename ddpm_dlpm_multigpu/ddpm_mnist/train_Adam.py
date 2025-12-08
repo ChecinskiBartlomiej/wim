@@ -11,7 +11,8 @@ if __name__ == "__main__":
     print(f"Batch size: {CONFIG.batch_size}")
     print(f"Learning rate: {CONFIG.optimizer_configs['Adam']['lr']}")
     print(f"Timesteps: {CONFIG.num_timesteps}")
-    print(f"Checkpoint epochs: {CONFIG.checkpoint_epochs}")
+    print(f"Image checkpoint epochs: {CONFIG.image_checkpoint_epochs}")
+    print(f"FID checkpoint epochs: {CONFIG.fid_checkpoint_epochs}")
     print("="*60 + "\n")
 
     train(CONFIG, optimizer_name="Adam")
