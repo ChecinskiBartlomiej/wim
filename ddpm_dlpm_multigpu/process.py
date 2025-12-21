@@ -335,6 +335,10 @@ class DDPM(DiffusionProcess):
     def get_loss(self):
         return torch.nn.functional.mse_loss
 
+    def get_per_sample_loss(self):
+        """Returns per-sample loss (no batch reduction) for bucket tracking."""
+        return lambda pred, target: ((pred - target) ** 2).mean(dim=(1, 2, 3))
+
 
 class DLPM(DiffusionProcess):
     """Denoising Levy Probabilistic Model (DLPM) implementation"""
@@ -502,4 +506,8 @@ class DLPM(DiffusionProcess):
 
     def get_loss(self):
         return lambda pred, target: torch.sqrt(((pred - target) ** 2).sum(dim=(1, 2, 3))).mean()
+
+    def get_per_sample_loss(self):
+        """Returns per-sample loss (no batch reduction) for bucket tracking."""
+        return lambda pred, target: torch.sqrt(((pred - target) ** 2).sum(dim=(1, 2, 3)))
 

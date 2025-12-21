@@ -433,7 +433,7 @@ class Unet(nn.Module):
 
         self.cv1 = nn.Conv2d(self.im_channels, self.down_ch[0], kernel_size=3, padding=1)
 
-        self.t_proj_dim = max(self.down_ch)
+        self.t_proj_dim = 512
 
         self.t_proj = nn.Sequential(
             nn.Linear(self.t_emb_dim, self.t_proj_dim),

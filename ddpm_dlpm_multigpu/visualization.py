@@ -124,6 +124,47 @@ def plot_generated_images(images, save_path, cmap, im_channels, img_size):
     plt.close()
 
 
+def plot_bucket_losses(all_bucket_losses, epochs, num_timesteps, save_path, title_suffix=""):
+    """
+    Plot loss per timestep bucket over epochs.
+
+    Args:
+        all_bucket_losses: List of lists, shape (num_epochs, 10), where each inner list
+                          contains mean loss for each of the 10 timestep buckets
+        epochs: List of epoch numbers (e.g., [1, 2, 3, ...])
+        num_timesteps: Total number of timesteps (e.g., 1000) for labeling
+        save_path: Path to save the plot
+        title_suffix: Optional suffix for plot title
+    """
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    num_buckets = len(all_bucket_losses[0]) if all_bucket_losses else 10
+    bucket_size = num_timesteps // num_buckets
+
+    # Use a colormap from blue (t=0, clean) to red (t=max, noisy)
+    cmap_colors = plt.cm.coolwarm(np.linspace(0, 1, num_buckets))
+
+    # Convert to numpy for easier slicing
+    bucket_losses_array = np.array(all_bucket_losses)  # shape: (num_epochs, 10)
+
+    for bucket_idx in range(num_buckets):
+        start_t = bucket_idx * bucket_size
+        end_t = (bucket_idx + 1) * bucket_size - 1
+        label = f't={start_t}-{end_t}'
+        ax.plot(epochs, bucket_losses_array[:, bucket_idx],
+                color=cmap_colors[bucket_idx], linewidth=2, label=label)
+
+    ax.set_xlabel('Epoch', fontsize=12)
+    ax.set_ylabel('Loss', fontsize=12)
+    ax.set_title(f'Loss by Timestep Bucket{title_suffix}', fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc='upper right', fontsize=9, ncol=2)
+
+    plt.tight_layout()
+    plt.savefig(str(save_path), dpi=150, bbox_inches="tight")
+    plt.close()
+
+
 def plot_denoising_progress(all_intermediate_images, all_timesteps, save_path, cmap, im_channels, img_size):
     """
     Plot the denoising process for multiple generated images.

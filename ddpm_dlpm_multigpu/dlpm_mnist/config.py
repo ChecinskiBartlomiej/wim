@@ -17,7 +17,7 @@ class CONFIG:
 
     num_epochs = 4000
     image_checkpoint_epochs = [100, 500, 1000, 2000, 3000, 4000]  # Generate sample images only
-    fid_checkpoint_epochs = [4000]  # Generate images + calculate FID
+    fid_checkpoint_epochs = [2000, 4000]  # Generate images + calculate FID
     
     alpha = 1.7  
   
@@ -73,4 +73,4 @@ class CONFIG:
     # DLPM-specific clamping and gradient clipping
     clamp_a = 20  # Clamp A samples to prevent extreme values
     clamp_eps = 200  # Clamp noise predictions
-    grad_clip = 5.0  # Gradient clipping
+    grad_clip = 1.0  # Gradient clipping

@@ -16,8 +16,8 @@ class CONFIG:
     use_horizontal_flip = True
 
     num_epochs = 4000
-    image_checkpoint_epochs = [100, 500, 1000, 2000, 3000, 4000]  # Generate sample images only
-    fid_checkpoint_epochs = [4000]  # Generate images + calculate FID
+    image_checkpoint_epochs = [100, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]  # Generate sample images only
+    fid_checkpoint_epochs = [2000, 4000, 6000, 8000]  # Generate images + calculate FID
 
     alpha = 1.7  
 
@@ -65,8 +65,8 @@ class CONFIG:
 
     use_scheduler = False
 
-    resume_checkpoint = None
-    #resume_checkpoint = "outputs/ddpm_cifar10/AdamW/ddpm_unet_epoch_3000.pth"
+    #resume_checkpoint = None
+    resume_checkpoint = "outputs/dlpm_cifar10/AdamW/dlpm_unet_epoch_4000.pth"
     eta = 0
 
     # DLPM-specific clamping and gradient clipping

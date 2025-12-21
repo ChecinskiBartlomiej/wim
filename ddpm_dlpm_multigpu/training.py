@@ -2,10 +2,10 @@ from ddpm_dlpm_multigpu.unet import Unet
 from ddpm_dlpm_multigpu.process import DDPM, DLPM
 from ddpm_dlpm_multigpu.metrics import (
     collect_gradient_stats, collect_weight_stats, save_weights_snapshot,
-    count_parameters, gather_training_stats
+    count_parameters, gather_training_stats, gather_bucket_losses, NUM_TIMESTEP_BUCKETS
 )
 from ddpm_dlpm_multigpu.fid import calculate_fid_from_model_distributed
-from ddpm_dlpm_multigpu.visualization import plot_combined_stats, plot_generated_images, plot_denoising_progress
+from ddpm_dlpm_multigpu.visualization import plot_combined_stats, plot_generated_images, plot_denoising_progress, plot_bucket_losses
 from ddpm_dlpm_multigpu.ema import EMA
 
 from torch.utils.data import DataLoader
@@ -15,6 +15,7 @@ import torch.distributed as dist
 from tqdm import tqdm
 import torch
 import numpy as np
+import json
 import os
 
 
@@ -93,6 +94,7 @@ def train(cfg, optimizer_name="Adam"):
     diffusion_name = cfg.diffusion.__name__.lower()
     diffusion = cfg.diffusion().to(device)
     criterion = diffusion.get_loss()
+    per_sample_criterion = diffusion.get_per_sample_loss()
 
     # Create Unet model and wrap it with DDP
     model = Unet(
@@ -157,7 +159,8 @@ def train(cfg, optimizer_name="Adam"):
         all_zero_weight_pcts = []
         all_update_ratios = []
         all_fid_scores = []
-        fid_file = optimizer_outputs_dir / "fid_scores.txt"
+        all_bucket_losses = []  # List of lists: (num_epochs, NUM_TIMESTEP_BUCKETS)
+        fid_file = optimizer_outputs_dir / "fid_scores.json"
 
     # Checkpoint resumption
     start_epoch = 0
@@ -191,6 +194,7 @@ def train(cfg, optimizer_name="Adam"):
             all_zero_weight_pcts = checkpoint.get('all_zero_weight_pcts', [])
             all_update_ratios = checkpoint.get('all_update_ratios', [])
             all_fid_scores = checkpoint.get('all_fid_scores', [])
+            all_bucket_losses = checkpoint.get('all_bucket_losses', [])
 
             print(f"Resumed from epoch {checkpoint['epoch']}")
             print(f"Starting training at epoch {start_epoch}")
@@ -217,6 +221,10 @@ def train(cfg, optimizer_name="Adam"):
             "zero_weight_percentage": [],
             "update_ratio": []
         }
+        # Bucket loss tracking: accumulate loss sums and counts per timestep bucket
+        bucket_size = cfg.num_timesteps // NUM_TIMESTEP_BUCKETS
+        epoch_bucket_losses = torch.zeros(NUM_TIMESTEP_BUCKETS, device=device)
+        epoch_bucket_counts = torch.zeros(NUM_TIMESTEP_BUCKETS, device=device)
 
         model.train()
 
@@ -238,6 +246,16 @@ def train(cfg, optimizer_name="Adam"):
 
             loss = criterion(noise_pred, noise)
             losses.append(loss.item())
+
+            # Track per-bucket losses using diffusion-specific per-sample loss
+            with torch.no_grad():
+                per_sample_loss = per_sample_criterion(noise_pred, noise)  # (batch_size,)
+                bucket_indices = torch.clamp(t // bucket_size, max=NUM_TIMESTEP_BUCKETS - 1)
+                for b in range(NUM_TIMESTEP_BUCKETS):
+                    mask = (bucket_indices == b)
+                    epoch_bucket_losses[b] += per_sample_loss[mask].sum()
+                    epoch_bucket_counts[b] += mask.sum()
+
             loss.backward()
 
             # Gradient clipping if grad_clip is set (DLPM stability)
@@ -282,7 +300,16 @@ def train(cfg, optimizer_name="Adam"):
             world_size=world_size,
             device=device
         )
-        
+
+        # Gather bucket losses from all ranks
+        global_bucket_losses = gather_bucket_losses(
+            epoch_bucket_losses,
+            epoch_bucket_counts,
+            rank=rank,
+            world_size=world_size,
+            device=device
+        )
+
         if rank == 0:
             # Store global statistics
             epoch_losses.append(global_stats['loss'])
@@ -292,6 +319,7 @@ def train(cfg, optimizer_name="Adam"):
             all_weight_norms.append(global_stats['weight_norm'])
             all_zero_weight_pcts.append(global_stats['zero_weight_pct'])
             all_update_ratios.append(global_stats['update_ratio'])
+            all_bucket_losses.append(global_bucket_losses)
 
             print(f"Epoch: {epoch+1} | Loss: {global_stats['loss']:.4f} (averaged across {world_size} GPUs)")
 
@@ -308,6 +336,7 @@ def train(cfg, optimizer_name="Adam"):
                 }
                 if cfg.use_scheduler:
                     best_model_dict['scheduler_state_dict'] = scheduler.state_dict()
+                model_path.parent.mkdir(parents=True, exist_ok=True)
                 torch.save(best_model_dict, str(model_path))
 
         # Synchronize all ranks after epoch statistics gathering
@@ -335,12 +364,14 @@ def train(cfg, optimizer_name="Adam"):
                     'all_weight_norms': all_weight_norms,
                     'all_zero_weight_pcts': all_zero_weight_pcts,
                     'all_update_ratios': all_update_ratios,
-                    'all_fid_scores': all_fid_scores
+                    'all_fid_scores': all_fid_scores,
+                    'all_bucket_losses': all_bucket_losses
                 }
 
                 if cfg.use_scheduler:
                     checkpoint_dict['scheduler_state_dict'] = scheduler.state_dict()
 
+                checkpoint_model_path.parent.mkdir(parents=True, exist_ok=True)
                 torch.save(checkpoint_dict, str(checkpoint_model_path))
 
                 # Generate all images at once with intermediate steps (batch generation), use EMA weights for generation
@@ -363,6 +394,7 @@ def train(cfg, optimizer_name="Adam"):
                         generated_imgs.append(final_img.flatten())
 
                 # Plot generated images (final images only)
+                optimizer_outputs_dir.mkdir(parents=True, exist_ok=True)
                 grid_plot_path = optimizer_outputs_dir / f"generated_images_epoch_{epoch+1}.png"
                 plot_generated_images(generated_imgs, grid_plot_path, cmap=cfg.cmap, im_channels=cfg.im_channels, img_size=cfg.img_size)
                 print(f"Saved {cfg.num_img_to_generate} generated images to {grid_plot_path}")
@@ -400,8 +432,18 @@ def train(cfg, optimizer_name="Adam"):
                     combined_plot_path,
                     title_suffix=f" - {optimizer_name}"
                 )
+                print(f"Combined statistics plot saved to {combined_plot_path}")
 
-                print(f"Combined statistics plot saved to {combined_plot_path}\n")
+                # Plot bucket losses
+                bucket_losses_path = optimizer_outputs_dir / f"bucket_losses_epoch_{epoch+1}.png"
+                plot_bucket_losses(
+                    all_bucket_losses,
+                    epochs_so_far,
+                    cfg.num_timesteps,
+                    bucket_losses_path,
+                    title_suffix=f" - {optimizer_name}"
+                )
+                print(f"Bucket losses plot saved to {bucket_losses_path}\n")
 
             # Synchronize gpus
             dist.barrier()
@@ -430,10 +472,11 @@ def train(cfg, optimizer_name="Adam"):
 
             # Only rank 0 saves FID score (other ranks get None)
             if rank == 0 and fid_score is not None:
-                all_fid_scores.append(fid_score)
-                with open(fid_file, 'a') as f:
-                    f.write(f"Epoch {epoch+1}: FID = {fid_score:.2f}\n")
-                print(f"FID results appended to: {fid_file}\n")
+                all_fid_scores.append({"epoch": epoch + 1, "fid": fid_score})
+                fid_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(fid_file, 'w') as f:
+                    json.dump({"fid_scores": all_fid_scores}, f, indent=2)
+                print(f"FID results saved to: {fid_file}\n")
 
             dist.barrier()
 

@@ -7,6 +7,46 @@ import torch
 import numpy as np
 
 
+NUM_TIMESTEP_BUCKETS = 10
+
+
+def gather_bucket_losses(local_bucket_losses, local_bucket_counts, rank, world_size, device):
+    """
+    Gather timestep bucket losses from all distributed processes to rank 0.
+
+    Args:
+        local_bucket_losses: Tensor of shape (NUM_TIMESTEP_BUCKETS,) with sum of losses per bucket
+        local_bucket_counts: Tensor of shape (NUM_TIMESTEP_BUCKETS,) with count of samples per bucket
+        rank: Process rank in distributed group
+        world_size: Total number of processes
+        device: Device to use for tensors
+
+    Returns:
+        If rank == 0: List of 10 floats (mean loss per bucket)
+        If rank != 0: None
+    """
+    import torch.distributed as dist
+
+    # Prepare gather lists on rank 0
+    gathered_losses = [torch.zeros(NUM_TIMESTEP_BUCKETS, device=device) for _ in range(world_size)] if rank == 0 else None
+    gathered_counts = [torch.zeros(NUM_TIMESTEP_BUCKETS, device=device) for _ in range(world_size)] if rank == 0 else None
+
+    # Gather from all ranks
+    dist.gather(local_bucket_losses, gathered_losses, dst=0)
+    dist.gather(local_bucket_counts, gathered_counts, dst=0)
+
+    if rank == 0:
+        # Sum losses and counts across all ranks
+        total_losses = torch.stack(gathered_losses).sum(dim=0)
+        total_counts = torch.stack(gathered_counts).sum(dim=0)
+
+        # Compute mean loss per bucket (avoid division by zero)
+        mean_losses = total_losses / (total_counts + 1e-10)
+        return mean_losses.tolist()
+    else:
+        return None
+
+
 def gather_training_stats(
     local_loss,
     local_grad_norm,
