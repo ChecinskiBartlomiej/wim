@@ -4,9 +4,9 @@
 # Job parameters
 #BSUB -m comp01              # Request A100 GPU node
 #BSUB -q normal            # Queue type (normal for batch jobs)
-#BSUB -n 28                # Number of CPU cores (7 cores per GPU × 4 GPUs)
-#BSUB -gpu num=4           # Request 4 GPUs
-#BSUB -M 65536             # Memory in MB (64 GB, 16GB per GPU × 4)
+#BSUB -n 7                 # Number of CPU cores (7 cores per GPU × 1 GPU)
+#BSUB -gpu num=1           # Request 1 GPU
+#BSUB -M 16384             # Memory in MB (16 GB for 1 GPU)
 #BSUB -W 99:00             # Max time HH:MM (99 hours)
 #BSUB -J ddpm_cifar10_adamw_multigpu # Job name
 #BSUB -o output_cifar10_adamw_%J.txt    # Standard output file (%J = job ID)
@@ -30,7 +30,7 @@ source $HOME/ddpm_env/bin/activate
 export OMP_NUM_THREADS=7
 
 # Run the training script with torchrun for multi-GPU DDP
-torchrun --nproc_per_node=4 --nnodes=1 -m ddpm_dlpm_multigpu.ddpm_cifar10.train_AdamW
+torchrun --nproc_per_node=1 --nnodes=1 -m ddpm_dlpm_multigpu.ddpm_cifar10.train_AdamW
 
 # Print job completion info
 echo "=================================================="

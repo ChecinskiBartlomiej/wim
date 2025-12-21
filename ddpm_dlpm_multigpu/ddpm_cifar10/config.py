@@ -20,7 +20,7 @@ class CONFIG:
     fid_checkpoint_epochs = [100, 500, 1000, 1500, 2050]  # Generate images + calculate FID
 
     num_timesteps = 1000
-    batch_size = 32
+    batch_size = 128
     img_size = 32
     im_channels = 3
     num_img_to_generate = 25
@@ -33,10 +33,10 @@ class CONFIG:
     fid_batch_size = 128
     inception_path = Path("pretrained_models/inception_v3_imagenet.pth")
     
-    unet_down_ch = [128, 256, 256, 256]
-    unet_mid_ch = [256, 256, 256]
-    unet_up_ch = [256, 256, 256, 128]
-    unet_down_sample = [True, True, True]
+    unet_down_ch = [32, 64, 128, 256, 512]
+    unet_mid_ch = [512, 512, 256]
+    unet_up_ch = [512, 256, 128, 64, 32]
+    unet_down_sample = [True, True, True, False]
     unet_num_downc_layers = 2
     unet_num_midc_layers = 2
     unet_num_upc_layers = 2
